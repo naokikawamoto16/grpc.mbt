@@ -1,0 +1,122 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "naokikawamoto16/grpc/internal"
+
+// Values
+pub async fn[Resp] await_unary(UnaryHandle[Resp]) -> Result[Resp, BackendError]
+
+pub fn[Resp] cancel_unary(UnaryHandle[Resp]) -> Unit
+
+pub fn capabilities() -> BackendCapabilities
+
+pub fn close_channel(ChannelHandle) -> Unit
+
+pub fn is_channel_closed(ChannelHandle) -> Bool
+
+pub fn[Resp] is_unary_done(UnaryHandle[Resp]) -> Bool
+
+pub fn new_channel(String, BackendChannelOptions) -> Result[ChannelHandle, BackendError]
+
+pub fn[Req, Resp] start_unary(ChannelHandle, String, Req, (Req) -> Bytes raise, (Bytes) -> Resp raise, BackendCallOptions) -> Result[UnaryHandle[Resp], BackendError]
+
+// Errors
+
+// Types and methods
+pub(all) struct BackendCallOptions {
+  metadata_text : Array[(String, Array[String])]
+  metadata_binary : Array[(String, Array[Bytes])]
+  timeout_ms : Int?
+  wait_for_ready : Bool
+}
+pub impl Eq for BackendCallOptions
+pub impl Show for BackendCallOptions
+pub impl ToJson for BackendCallOptions
+
+pub(all) struct BackendCapabilities {
+  unary : Bool
+  server_streaming : Bool
+  client_streaming : Bool
+  bidi_streaming : Bool
+}
+pub impl Eq for BackendCapabilities
+pub impl Show for BackendCapabilities
+pub impl ToJson for BackendCapabilities
+
+pub(all) struct BackendChannelOptions {
+  security : BackendSecurity
+  max_send_message_length : Int?
+  max_receive_message_length : Int?
+  keepalive_time_ms : Int?
+  keepalive_timeout_ms : Int?
+  default_authority : String?
+  user_agent : String?
+}
+pub impl Eq for BackendChannelOptions
+
+pub struct BackendError {
+  code : Int
+  message : String
+  details : String?
+  metadata_text : Array[(String, Array[String])]
+  metadata_binary : Array[(String, Array[Bytes])]
+  kind : BackendErrorKind
+}
+pub impl Eq for BackendError
+pub impl Show for BackendError
+pub impl ToJson for BackendError
+
+pub enum BackendErrorKind {
+  Status
+  Transport
+  Timeout
+  Cancelled
+  CodecEncode
+  CodecDecode
+  ChannelClosed
+  Internal
+}
+pub impl Eq for BackendErrorKind
+pub impl Show for BackendErrorKind
+pub impl ToJson for BackendErrorKind
+
+pub(all) enum BackendSecurity {
+  Insecure
+  Tls(BackendTlsOptions)
+}
+pub impl Eq for BackendSecurity
+
+pub(all) struct BackendTlsOptions {
+  root_certs : Bytes?
+  private_key : Bytes?
+  cert_chain : Bytes?
+  server_name_override : String?
+  reject_unauthorized : Bool?
+}
+pub impl Eq for BackendTlsOptions
+
+pub struct ChannelHandle {
+  // private fields
+}
+
+pub(all) enum DebugEvent {
+  CancelTriggered
+}
+pub impl Eq for DebugEvent
+pub impl Show for DebugEvent
+pub impl ToJson for DebugEvent
+
+pub struct FinishOnce[T] {
+  mut value : T?
+}
+pub fn[T] FinishOnce::finish(Self[T], T) -> Bool
+pub fn[T] FinishOnce::get(Self[T]) -> T?
+pub fn[T] FinishOnce::is_done(Self[T]) -> Bool
+pub fn[T] FinishOnce::new() -> Self[T]
+
+pub struct UnaryHandle[Resp] {
+  // private fields
+}
+
+// Type aliases
+
+// Traits
+

@@ -1,0 +1,139 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "naokikawamoto16/grpc/internal/backend_grpc_js"
+
+// Values
+pub async fn await_unary(UnaryCall) -> RawUnaryOutcome
+
+pub async fn[Resp] await_unary_with_codec(UnaryCall, (Bytes) -> Resp raise) -> Result[Resp, RawError]
+
+pub fn cancel_unary(UnaryCall) -> Unit
+
+pub fn close_channel(Channel) -> Unit
+
+pub fn conversion_counters() -> ConversionCounters
+
+pub fn ensure_grpc_js() -> Result[Unit, String]
+
+pub async fn generate_test_tls_material() -> (Bytes, Bytes)
+
+pub fn is_channel_closed(Channel) -> Bool
+
+pub fn is_unary_done(UnaryCall) -> Bool
+
+pub fn new_channel(String, RawChannelOptions) -> Result[Channel, String]
+
+pub async fn read_text_file(String) -> String
+
+pub fn reset_conversion_counters() -> Unit
+
+pub async fn start_test_server_insecure() -> TestServer
+
+pub async fn start_test_server_tls(Bytes, Bytes) -> TestServer
+
+pub fn start_unary(Channel, String, Bytes, RawCallOptions) -> Result[UnaryCall, RawError]
+
+pub fn[Req] start_unary_with_codec(Channel, String, Req, (Req) -> Bytes raise, RawCallOptions) -> Result[UnaryCall, RawError]
+
+// Errors
+
+// Types and methods
+pub struct Channel {
+  // private fields
+}
+
+pub(all) struct ConversionCounters {
+  bytes_to_buffer : Int
+  buffer_to_bytes : Int
+}
+pub impl Eq for ConversionCounters
+pub impl Show for ConversionCounters
+pub impl ToJson for ConversionCounters
+
+#external
+pub type JsChannel
+
+#external
+pub type JsTestServer
+
+#external
+pub type JsUnaryCall
+
+#external
+pub type JsUnaryOutcome
+
+pub(all) struct RawCallOptions {
+  metadata_text : Array[(String, Array[String])]
+  metadata_binary : Array[(String, Array[Bytes])]
+  timeout_ms : Int?
+  wait_for_ready : Bool
+}
+pub impl Eq for RawCallOptions
+pub impl Show for RawCallOptions
+pub impl ToJson for RawCallOptions
+
+pub(all) struct RawChannelOptions {
+  security : RawSecurity
+  max_send_message_length : Int?
+  max_receive_message_length : Int?
+  keepalive_time_ms : Int?
+  keepalive_timeout_ms : Int?
+  default_authority : String?
+  user_agent : String?
+}
+pub impl Eq for RawChannelOptions
+pub impl Show for RawChannelOptions
+pub impl ToJson for RawChannelOptions
+
+pub(all) struct RawError {
+  code : Int
+  message : String
+  details : String?
+  metadata_text : Array[(String, Array[String])]
+  metadata_binary : Array[(String, Array[Bytes])]
+  kind : String
+}
+pub impl Eq for RawError
+pub impl Show for RawError
+pub impl ToJson for RawError
+
+pub(all) enum RawSecurity {
+  Insecure
+  Tls(RawTlsOptions)
+}
+pub impl Eq for RawSecurity
+pub impl Show for RawSecurity
+pub impl ToJson for RawSecurity
+
+pub(all) struct RawTlsOptions {
+  root_certs : Bytes?
+  private_key : Bytes?
+  cert_chain : Bytes?
+  server_name_override : String?
+  reject_unauthorized : Bool?
+}
+pub impl Eq for RawTlsOptions
+pub impl Show for RawTlsOptions
+pub impl ToJson for RawTlsOptions
+
+pub(all) enum RawUnaryOutcome {
+  Success(Bytes)
+  Failure(RawError)
+}
+pub impl Eq for RawUnaryOutcome
+pub impl Show for RawUnaryOutcome
+pub impl ToJson for RawUnaryOutcome
+
+pub struct TestServer {
+  // private fields
+}
+pub fn TestServer::port(Self) -> Int
+pub async fn TestServer::stop(Self) -> Unit
+
+pub struct UnaryCall {
+  // private fields
+}
+
+// Type aliases
+
+// Traits
+

@@ -1,0 +1,14 @@
+grpc.mbt is a third-party project.
+It is not affiliated with, endorsed by, or sponsored by The Linux Foundation,
+the Cloud Native Computing Foundation (CNCF), or the gRPC project.
+gRPC® is a registered trademark of The Linux Foundation.
+
+This product includes third-party software components.
+
+- gRPC-related components by the gRPC Authors (@grpc/grpc-js, @grpc/proto-loader) under Apache-2.0.
+- MoonBit-related components by the MoonBit Authors:
+  - `moonbitlang/async` under Apache-2.0
+  - `moonbitlang/protobuf` under Apache-2.0 WITH LLVM-exception
+- Additional third-party components under Apache-2.0, MIT, BSD-3-Clause, and ISC.
+
+For the full dependency and license list, see `THIRD_PARTY_NOTICES.md`.

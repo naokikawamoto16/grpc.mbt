@@ -1,0 +1,11 @@
+import {
+  "moonbitlang/core/buffer" @buffer,
+  "moonbitlang/protobuf" @protobuf,
+  "naokikawamoto16/grpc/internal" @internal,
+}
+
+import {
+  "moonbitlang/async" @async,
+  "moonbitlang/core/encoding/utf8" @utf8,
+  "naokikawamoto16/grpc/internal/backend_test_util" @backend_test_util,
+} for "test"

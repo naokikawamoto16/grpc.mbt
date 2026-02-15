@@ -1,0 +1,169 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "naokikawamoto16/grpc"
+
+import {
+  "moonbitlang/protobuf",
+}
+
+// Values
+pub fn[T : Default + @protobuf.Read] decode_protobuf(Bytes) -> T raise
+
+pub fn[T : @protobuf.Write] encode_protobuf(T) -> Bytes raise
+
+pub fn[Req : @protobuf.Write, Resp : Default + @protobuf.Read] protobuf_codec() -> Codec[Req, Resp]
+
+// Errors
+
+// Types and methods
+pub(all) struct CallOptions {
+  metadata : Metadata
+  timeout_ms : Int?
+  wait_for_ready : Bool
+}
+pub impl Eq for CallOptions
+pub impl Show for CallOptions
+pub impl ToJson for CallOptions
+
+pub struct Channel {
+  // private fields
+}
+pub fn Channel::close(Self) -> Unit
+pub fn Channel::is_closed(Self) -> Bool
+pub fn Channel::new(String, options? : ChannelOptions) -> Result[Self, RpcError]
+
+pub(all) struct ChannelOptions {
+  security : Security
+  max_send_message_length : Int?
+  max_receive_message_length : Int?
+  keepalive_time_ms : Int?
+  keepalive_timeout_ms : Int?
+  default_authority : String?
+  user_agent : String?
+}
+pub impl Eq for ChannelOptions
+pub impl Show for ChannelOptions
+pub impl ToJson for ChannelOptions
+
+pub struct Client {
+  // private fields
+}
+pub fn Client::new(Channel) -> Self
+pub fn[Req, Resp] Client::start_unary(Self, MethodDescriptor[Req, Resp], Req, options? : CallOptions) -> UnaryCall[Resp]
+pub async fn[Req, Resp] Client::unary(Self, MethodDescriptor[Req, Resp], Req, options? : CallOptions) -> Result[Resp, RpcError]
+
+pub(all) struct Codec[Req, Resp] {
+  encode : (Req) -> Bytes raise
+  decode : (Bytes) -> Resp raise
+}
+
+pub(all) struct Metadata {
+  // private fields
+}
+pub fn Metadata::add_binary(Self, String, Bytes) -> Result[Unit, RpcError]
+pub fn Metadata::add_text(Self, String, String) -> Result[Unit, RpcError]
+pub fn Metadata::entries(Self) -> Array[(String, Array[MetadataValue])]
+pub fn Metadata::get(Self, String) -> Array[MetadataValue]
+pub fn Metadata::new() -> Self
+pub impl Eq for Metadata
+pub impl Show for Metadata
+pub impl ToJson for Metadata
+
+pub(all) enum MetadataValue {
+  Text(String)
+  Binary(Bytes)
+}
+pub impl Eq for MetadataValue
+pub impl Show for MetadataValue
+pub impl ToJson for MetadataValue
+
+pub(all) struct MethodDescriptor[Req, Resp] {
+  service : String
+  method_name : String
+  path : String
+  codec : Codec[Req, Resp]
+}
+pub fn[Req, Resp] MethodDescriptor::new(String, String, Codec[Req, Resp]) -> Result[Self[Req, Resp], RpcError]
+
+pub(all) struct RpcError {
+  code : StatusCode
+  message : String
+  details : String?
+  metadata : Metadata
+  kind : RpcErrorKind
+}
+pub impl Eq for RpcError
+pub impl Show for RpcError
+pub impl ToJson for RpcError
+
+pub(all) enum RpcErrorKind {
+  Status
+  Transport
+  Timeout
+  Cancelled
+  InvalidArgument
+  CodecEncode
+  CodecDecode
+  ChannelClosed
+  Internal
+}
+pub impl Compare for RpcErrorKind
+pub impl Eq for RpcErrorKind
+pub impl Hash for RpcErrorKind
+pub impl Show for RpcErrorKind
+pub impl ToJson for RpcErrorKind
+
+pub(all) enum Security {
+  Insecure
+  Tls(TlsOptions)
+}
+pub impl Eq for Security
+pub impl Show for Security
+pub impl ToJson for Security
+
+pub(all) enum StatusCode {
+  Ok
+  Cancelled
+  Unknown
+  InvalidArgument
+  DeadlineExceeded
+  NotFound
+  AlreadyExists
+  PermissionDenied
+  ResourceExhausted
+  FailedPrecondition
+  Aborted
+  OutOfRange
+  Unimplemented
+  Internal
+  Unavailable
+  DataLoss
+  Unauthenticated
+}
+pub impl Compare for StatusCode
+pub impl Eq for StatusCode
+pub impl Hash for StatusCode
+pub impl Show for StatusCode
+pub impl ToJson for StatusCode
+
+pub(all) struct TlsOptions {
+  root_certs : Bytes?
+  private_key : Bytes?
+  cert_chain : Bytes?
+  server_name_override : String?
+  reject_unauthorized : Bool?
+}
+pub impl Eq for TlsOptions
+pub impl Show for TlsOptions
+pub impl ToJson for TlsOptions
+
+pub struct UnaryCall[Resp] {
+  // private fields
+}
+pub fn[Resp] UnaryCall::cancel(Self[Resp]) -> Unit
+pub fn[Resp] UnaryCall::is_done(Self[Resp]) -> Bool
+pub async fn[Resp] UnaryCall::wait(Self[Resp]) -> Result[Resp, RpcError]
+
+// Type aliases
+
+// Traits
+

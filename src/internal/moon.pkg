@@ -1,0 +1,3 @@
+import {
+  "naokikawamoto16/grpc/internal/backend" @backend,
+}

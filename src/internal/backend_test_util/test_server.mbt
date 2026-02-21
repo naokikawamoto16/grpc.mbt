@@ -13,39 +13,65 @@
 // limitations under the License.
 
 ///|
-pub struct TestServer {
-  priv inner : @impl.TestServer
+pub(all) struct BackendTest {}
+
+///|
+pub(all) struct TestServer {
+  priv inner : JsTestServer
 }
 
 ///|
-pub async fn start_test_server_insecure() -> TestServer {
-  { inner: @impl.start_test_server_insecure() }
+pub async fn BackendTest::start_test_server_insecure() -> TestServer {
+  let inner = @js_async.run_promise(signal => {
+    ignore(signal)
+    ffi_test_server_start(true, None, None)
+  })
+  { inner, }
 }
 
 ///|
-pub async fn start_test_server_tls(
+pub async fn BackendTest::start_test_server_tls(
   cert_chain : Bytes,
   private_key : Bytes,
 ) -> TestServer {
-  { inner: @impl.start_test_server_tls(cert_chain, private_key) }
+  let inner = @js_async.run_promise(signal => {
+    ignore(signal)
+    ffi_test_server_start(false, Some(cert_chain), Some(private_key))
+  })
+  { inner, }
 }
 
 ///|
 pub fn TestServer::port(self : TestServer) -> Int {
-  self.inner.port()
+  ffi_test_server_port(self.inner)
 }
 
 ///|
 pub async fn TestServer::stop(self : TestServer) -> Unit {
-  self.inner.stop()
+  ignore(
+    @js_async.run_promise(signal => {
+      ignore(signal)
+      ffi_test_server_stop(self.inner)
+    }),
+  )
 }
 
 ///|
-pub async fn read_text_file(path : String) -> String {
-  @impl.read_text_file(path)
+pub async fn BackendTest::read_text_file(path : String) -> String {
+  @js_async.run_promise(signal => {
+    ignore(signal)
+    ffi_read_text_file(path)
+  })
 }
 
 ///|
-pub async fn generate_test_tls_material() -> (Bytes, Bytes) {
-  @impl.generate_test_tls_material()
+pub async fn BackendTest::generate_test_tls_material() -> (Bytes, Bytes) {
+  let generated = @js_async.run_promise(signal => {
+    ignore(signal)
+    ffi_generate_test_tls_material()
+  })
+  if generated.length() < 2 {
+    panic()
+  }
+  (generated[0], generated[1])
 }

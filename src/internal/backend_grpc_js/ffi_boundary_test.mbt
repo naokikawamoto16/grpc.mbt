@@ -22,8 +22,7 @@ let ffi_source_path : String = "src/internal/backend_grpc_js/ffi_grpc_js.mbt"
 /// MoonBit extern functions cannot be generic, so the adapter layer must
 /// encode/decode on the MoonBit side and pass raw `Bytes` across the FFI.
 async test "Codec generics stay out of extern boundary" {
-  @async.sleep(0)
-  let ffi_source = read_text_file(ffi_source_path)
+  let ffi_source = @test_util.BackendTest::read_text_file(ffi_source_path)
   assert_true(ffi_source.contains("extern \"js\" fn ffi_start_unary("))
   assert_true(ffi_source.contains("request : Bytes"))
   assert_true(!ffi_source.contains("ffi_start_unary_with_codec"))
@@ -33,8 +32,7 @@ async test "Codec generics stay out of extern boundary" {
 ///|
 /// Verify wait_for_ready is wired through metadata options expected by grpc-js.
 async test "wait_for_ready is passed via metadata options" {
-  @async.sleep(0)
-  let ffi_source = read_text_file(ffi_source_path)
+  let ffi_source = @test_util.BackendTest::read_text_file(ffi_source_path)
   assert_true(
     ffi_source.contains("metadata.setOptions({ waitForReady: true });"),
   )
@@ -44,8 +42,7 @@ async test "wait_for_ready is passed via metadata options" {
 ///|
 /// Verify reject_unauthorized is passed to createSsl verifyOptions.
 async test "reject_unauthorized is passed via createSsl verifyOptions" {
-  @async.sleep(0)
-  let ffi_source = read_text_file(ffi_source_path)
+  let ffi_source = @test_util.BackendTest::read_text_file(ffi_source_path)
   assert_true(
     ffi_source.contains(
       "? { rejectUnauthorized: Boolean(reject_unauthorized) }",

@@ -21,12 +21,6 @@ pub(all) struct RawCallOptions {
 } derive(Show, Eq, ToJson)
 
 ///|
-pub(all) struct ConversionCounters {
-  bytes_to_buffer : Int
-  buffer_to_bytes : Int
-} derive(Show, Eq, ToJson)
-
-///|
 pub struct UnaryCall {
   priv inner : JsUnaryCall
   priv mut cached : RawUnaryOutcome?
@@ -49,28 +43,6 @@ fn internal_raw_error(
   kind? : String,
 ) -> RawError {
   raw_error(grpc_internal, message, kind.unwrap_or("internal"), details)
-}
-
-///|
-pub fn reset_conversion_counters() -> Unit {
-  ffi_reset_conversion_counters()
-}
-
-///|
-pub fn conversion_counters() -> ConversionCounters {
-  let values = ffi_get_conversion_counters()
-  {
-    bytes_to_buffer: if values.length() > 0 {
-      values[0]
-    } else {
-      0
-    },
-    buffer_to_bytes: if values.length() > 1 {
-      values[1]
-    } else {
-      0
-    },
-  }
 }
 
 ///|

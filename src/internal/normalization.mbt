@@ -17,39 +17,25 @@
 let internal_status_code : Int = 13
 
 ///|
-fn backend_error_kind(kind : @backend.RawErrorKind) -> BackendErrorKind {
-  match kind {
-    @backend.Status => Status
-    @backend.Transport => Transport
-    @backend.Timeout => Timeout
-    @backend.Cancelled => Cancelled
-    @backend.CodecEncode => CodecEncode
-    @backend.CodecDecode => CodecDecode
-    @backend.ChannelClosed => ChannelClosed
-    @backend.Internal => Internal
-  }
-}
-
-///|
-fn from_raw_error(raw : @backend.RawError) -> BackendError {
+fn from_raw_error(raw : @impl.RawError) -> BackendError {
   {
     code: raw.code,
     message: raw.message,
     details: raw.details,
     metadata_text: raw.metadata_text,
     metadata_binary: raw.metadata_binary,
-    kind: backend_error_kind(raw.kind),
+    kind: raw.kind,
   }
 }
 
 ///|
-fn message_error(message : String, kind? : BackendErrorKind) -> BackendError {
+fn message_error(message : String, kind? : String) -> BackendError {
   {
     code: internal_status_code,
     message,
     details: None,
     metadata_text: [],
     metadata_binary: [],
-    kind: kind.unwrap_or(Internal),
+    kind: kind.unwrap_or("internal"),
   }
 }

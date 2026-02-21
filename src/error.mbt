@@ -93,19 +93,19 @@ fn channel_closed_error(message : String?) -> RpcError {
 /// Convert a backend-layer `BackendError` into a public `RpcError`.
 ///
 /// The status code is decoded from the integer representation, the error kind
-/// is mapped from `BackendErrorKind` to `RpcErrorKind`, and raw metadata
+/// string is mapped to `RpcErrorKind`, and raw metadata
 /// arrays are reassembled into a `Metadata` value.
 fn normalize_backend_error(error : @internal.BackendError) -> RpcError {
   let code = status_code_from_int(error.code)
   let kind = match error.kind {
-    @internal.Status => Status
-    @internal.Transport => Transport
-    @internal.Timeout => Timeout
-    @internal.Cancelled => Cancelled
-    @internal.CodecEncode => CodecEncode
-    @internal.CodecDecode => CodecDecode
-    @internal.ChannelClosed => ChannelClosed
-    @internal.Internal => Internal
+    "status" => Status
+    "transport" => Transport
+    "timeout" => Timeout
+    "cancelled" => Cancelled
+    "codec_encode" => CodecEncode
+    "codec_decode" => CodecDecode
+    "channel_closed" => ChannelClosed
+    _ => Internal
   }
   {
     code,

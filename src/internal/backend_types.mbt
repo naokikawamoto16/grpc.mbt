@@ -13,25 +13,13 @@
 // limitations under the License.
 
 ///|
-pub enum BackendErrorKind {
-  Status
-  Transport
-  Timeout
-  Cancelled
-  CodecEncode
-  CodecDecode
-  ChannelClosed
-  Internal
-} derive(Show, Eq, ToJson)
-
-///|
 pub struct BackendError {
   code : Int
   message : String
   details : String?
   metadata_text : Array[(String, Array[String])]
   metadata_binary : Array[(String, Array[Bytes])]
-  kind : BackendErrorKind
+  kind : String
 } derive(Show, Eq, ToJson)
 
 ///|
@@ -69,21 +57,13 @@ pub(all) struct BackendCallOptions {
 } derive(Show, Eq, ToJson)
 
 ///|
-pub(all) struct BackendCapabilities {
-  unary : Bool
-  server_streaming : Bool
-  client_streaming : Bool
-  bidi_streaming : Bool
-} derive(Show, Eq, ToJson)
-
-///|
 pub struct ChannelHandle {
-  priv inner : @backend.Channel
+  priv inner : @impl.Channel
 }
 
 ///|
 pub struct UnaryHandle[Resp] {
-  priv inner : @backend.UnaryCall
+  priv inner : @impl.UnaryCall
   priv done : FinishOnce[Result[Resp, BackendError]]
   priv decode : (Bytes) -> Resp raise
 }

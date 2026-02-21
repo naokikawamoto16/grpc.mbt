@@ -16,7 +16,7 @@
 suberror DecodeFail
 
 ///|
-fn default_channel_options_for_test() -> RawChannelOptions {
+fn insecure_channel_options_for_test() -> BackendChannelOptions {
   {
     security: Insecure,
     max_send_message_length: None,
@@ -29,8 +29,18 @@ fn default_channel_options_for_test() -> RawChannelOptions {
 }
 
 ///|
+fn call_options_for_test() -> BackendCallOptions {
+  {
+    metadata_text: [],
+    metadata_binary: [],
+    timeout_ms: None,
+    wait_for_ready: false,
+  }
+}
+
+///|
 fn to_impl_channel_options_for_test(
-  options : RawChannelOptions,
+  options : BackendChannelOptions,
 ) -> @impl.RawChannelOptions {
   let security = match options.security {
     Insecure => @impl.Insecure
@@ -55,26 +65,15 @@ fn to_impl_channel_options_for_test(
 }
 
 ///|
-fn default_call_options_for_test() -> RawCallOptions {
-  {
-    metadata_text: [],
-    metadata_binary: [],
-    timeout_ms: None,
-    wait_for_ready: false,
-  }
-}
-
-///|
 fn decode_fail(_ : Bytes) -> String raise {
   raise DecodeFail
 }
 
 ///|
-async test "Facade new_channel delegates Ok/Err to implementation" {
-  @async.sleep(0)
-  let server = @impl.start_test_server_insecure()
+async test "backend_port new_channel matches impl result shape" {
+  let server = @backend_test_util.BackendTest::start_test_server_insecure()
   let target = "127.0.0.1:\{server.port()}"
-  let options = default_channel_options_for_test()
+  let options = insecure_channel_options_for_test()
   let facade = new_channel(target, options)
   let direct = @impl.new_channel(
     target,
@@ -88,7 +87,10 @@ async test "Facade new_channel delegates Ok/Err to implementation" {
       close_channel(channel)
       @impl.close_channel(raw_channel)
     }
-    (Err(lhs), Err(rhs)) => assert_eq(lhs, rhs)
+    (Err(lhs), Err(rhs)) => {
+      assert_eq(lhs.kind, "transport")
+      assert_eq(lhs.message, rhs)
+    }
     _ => panic()
   }
 
@@ -96,52 +98,42 @@ async test "Facade new_channel delegates Ok/Err to implementation" {
 }
 
 ///|
-async test "Facade unary keeps cancel idempotency and codec decode normalization" {
-  @async.sleep(0)
-  let server = @impl.start_test_server_insecure()
+async test "backend_port unary keeps cancel idempotency and codec decode normalization" {
+  let server = @backend_test_util.BackendTest::start_test_server_insecure()
   let target = "127.0.0.1:\{server.port()}"
-  let channel = new_channel(target, default_channel_options_for_test()).unwrap()
-  let call_options = default_call_options_for_test()
+  let channel = new_channel(target, insecure_channel_options_for_test()).unwrap()
+  let call_options = call_options_for_test()
 
-  let cancel_call = start_unary_with_codec(
+  let cancel_call = start_unary(
     channel,
     "/test.EchoService/Echo",
     "sleep:200:done",
     text => @utf8.encode(text),
+    bytes => @utf8.decode(bytes),
     call_options,
   ).unwrap()
   cancel_unary(cancel_call)
   cancel_unary(cancel_call)
-  let cancelled = await_unary_with_codec(cancel_call, bytes => {
-    @utf8.decode(bytes)
-  })
+  let cancelled = await_unary(cancel_call)
   match cancelled {
     Ok(_) => panic()
-    Err(error) => assert_eq(error.kind, Cancelled)
+    Err(error) => assert_eq(error.kind, "cancelled")
   }
 
-  let decode_call = start_unary_with_codec(
+  let decode_call = start_unary(
     channel,
     "/test.EchoService/Echo",
     "hello",
     text => @utf8.encode(text),
+    decode_fail,
     call_options,
   ).unwrap()
-  let decoded = await_unary_with_codec(decode_call, decode_fail)
+  let decoded = await_unary(decode_call)
   match decoded {
     Ok(_) => panic()
-    Err(error) => assert_eq(error.kind, CodecDecode)
+    Err(error) => assert_eq(error.kind, "codec_decode")
   }
 
   close_channel(channel)
   server.stop()
-}
-
-///|
-test "Capabilities expose current unary-only support" {
-  let caps = capabilities()
-  assert_true(caps.unary)
-  assert_true(!caps.server_streaming)
-  assert_true(!caps.client_streaming)
-  assert_true(!caps.bidi_streaming)
 }

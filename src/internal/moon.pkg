@@ -1,3 +1,9 @@
 import {
-  "naokikawamoto16/grpc/internal/backend" @backend,
+  "naokikawamoto16/grpc/internal/backend_grpc_js" @impl,
 }
+
+import {
+  "moonbitlang/async",
+  "moonbitlang/core/encoding/utf8" @utf8,
+  "naokikawamoto16/grpc/internal/backend_test_util" @backend_test_util,
+} for "test"

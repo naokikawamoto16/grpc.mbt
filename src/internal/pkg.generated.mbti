@@ -6,8 +6,6 @@ pub async fn[Resp] await_unary(UnaryHandle[Resp]) -> Result[Resp, BackendError]
 
 pub fn[Resp] cancel_unary(UnaryHandle[Resp]) -> Unit
 
-pub fn capabilities() -> BackendCapabilities
-
 pub fn close_channel(ChannelHandle) -> Unit
 
 pub fn is_channel_closed(ChannelHandle) -> Bool
@@ -31,16 +29,6 @@ pub impl Eq for BackendCallOptions
 pub impl Show for BackendCallOptions
 pub impl ToJson for BackendCallOptions
 
-pub(all) struct BackendCapabilities {
-  unary : Bool
-  server_streaming : Bool
-  client_streaming : Bool
-  bidi_streaming : Bool
-}
-pub impl Eq for BackendCapabilities
-pub impl Show for BackendCapabilities
-pub impl ToJson for BackendCapabilities
-
 pub(all) struct BackendChannelOptions {
   security : BackendSecurity
   max_send_message_length : Int?
@@ -58,25 +46,11 @@ pub struct BackendError {
   details : String?
   metadata_text : Array[(String, Array[String])]
   metadata_binary : Array[(String, Array[Bytes])]
-  kind : BackendErrorKind
+  kind : String
 }
 pub impl Eq for BackendError
 pub impl Show for BackendError
 pub impl ToJson for BackendError
-
-pub enum BackendErrorKind {
-  Status
-  Transport
-  Timeout
-  Cancelled
-  CodecEncode
-  CodecDecode
-  ChannelClosed
-  Internal
-}
-pub impl Eq for BackendErrorKind
-pub impl Show for BackendErrorKind
-pub impl ToJson for BackendErrorKind
 
 pub(all) enum BackendSecurity {
   Insecure

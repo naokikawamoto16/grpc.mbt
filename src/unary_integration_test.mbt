@@ -14,7 +14,7 @@
 
 ///|
 async test "Insecure parallel unary" {
-  let server = @backend_test_util.start_test_server_insecure()
+  let server = @backend_test_util.BackendTest::start_test_server_insecure()
   let channel = Channel::new("127.0.0.1:\{server.port()}").unwrap()
   let client = Client::new(channel)
   let descriptor = MethodDescriptor::new(
@@ -37,10 +37,10 @@ async test "Insecure parallel unary" {
 
 ///|
 async test "TLS unary" {
-  let tls_material = @backend_test_util.generate_test_tls_material()
+  let tls_material = @backend_test_util.BackendTest::generate_test_tls_material()
   let cert = tls_material.0
   let key = tls_material.1
-  let server = @backend_test_util.start_test_server_tls(cert, key)
+  let server = @backend_test_util.BackendTest::start_test_server_tls(cert, key)
   let options : ChannelOptions = {
     security: Tls({
       root_certs: Some(cert),
@@ -72,10 +72,10 @@ async test "TLS unary" {
 
 ///|
 async test "TLS unary with reject_unauthorized=false allows self-signed server without roots" {
-  let tls_material = @backend_test_util.generate_test_tls_material()
+  let tls_material = @backend_test_util.BackendTest::generate_test_tls_material()
   let cert = tls_material.0
   let key = tls_material.1
-  let server = @backend_test_util.start_test_server_tls(cert, key)
+  let server = @backend_test_util.BackendTest::start_test_server_tls(cert, key)
   let options : ChannelOptions = {
     security: Tls({
       root_certs: None,
@@ -107,7 +107,7 @@ async test "TLS unary with reject_unauthorized=false allows self-signed server w
 
 ///|
 async test "Bytes/Buffer performance smoke" {
-  let server = @backend_test_util.start_test_server_insecure()
+  let server = @backend_test_util.BackendTest::start_test_server_insecure()
   let channel = Channel::new("127.0.0.1:\{server.port()}").unwrap()
   let client = Client::new(channel)
   let descriptor = MethodDescriptor::new(
@@ -117,9 +117,9 @@ async test "Bytes/Buffer performance smoke" {
   ).unwrap()
   let payload = Bytes::make(256 * 1024, 97)
 
-  @backend_test_util.reset_conversion_counters()
+  @backend_test_util.BackendTest::reset_conversion_counters()
   let result = client.unary(descriptor, payload)
-  let counters = @backend_test_util.conversion_counters()
+  let counters = @backend_test_util.BackendTest::conversion_counters()
 
   match result {
     Ok(response) => {
@@ -136,7 +136,7 @@ async test "Bytes/Buffer performance smoke" {
 
 ///|
 async test "Close during in-flight unary keeps terminal state consistent" {
-  let server = @backend_test_util.start_test_server_insecure()
+  let server = @backend_test_util.BackendTest::start_test_server_insecure()
   let channel = Channel::new("127.0.0.1:\{server.port()}").unwrap()
   let client = Client::new(channel)
   let descriptor = MethodDescriptor::new(
@@ -158,7 +158,7 @@ async test "Close during in-flight unary keeps terminal state consistent" {
 
 ///|
 async test "wait_for_ready delays transient unavailable until deadline" {
-  let seeded = @backend_test_util.start_test_server_insecure()
+  let seeded = @backend_test_util.BackendTest::start_test_server_insecure()
   let dead_port = seeded.port()
   seeded.stop()
 

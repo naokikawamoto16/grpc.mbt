@@ -3,5 +3,6 @@ import {
 }
 
 import {
-  "moonbitlang/async" @async,
+  "naokikawamoto16/grpc/internal/backend_test_util" @test_util,
+  "moonbitlang/async",
 } for "test"

@@ -44,7 +44,7 @@ async fn new_insecure_client() -> (
   Channel,
   @backend_test_util.TestServer,
 ) {
-  let server = @backend_test_util.start_test_server_insecure()
+  let server = @backend_test_util.BackendTest::start_test_server_insecure()
   let target = "127.0.0.1:\{server.port()}"
   let channel = Channel::new(target).unwrap()
   (Client::new(channel), channel, server)

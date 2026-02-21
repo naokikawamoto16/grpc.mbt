@@ -10,25 +10,13 @@ pub fn cancel_unary(UnaryCall) -> Unit
 
 pub fn close_channel(Channel) -> Unit
 
-pub fn conversion_counters() -> ConversionCounters
-
 pub fn ensure_grpc_js() -> Result[Unit, String]
-
-pub async fn generate_test_tls_material() -> (Bytes, Bytes)
 
 pub fn is_channel_closed(Channel) -> Bool
 
 pub fn is_unary_done(UnaryCall) -> Bool
 
 pub fn new_channel(String, RawChannelOptions) -> Result[Channel, String]
-
-pub async fn read_text_file(String) -> String
-
-pub fn reset_conversion_counters() -> Unit
-
-pub async fn start_test_server_insecure() -> TestServer
-
-pub async fn start_test_server_tls(Bytes, Bytes) -> TestServer
 
 pub fn start_unary(Channel, String, Bytes, RawCallOptions) -> Result[UnaryCall, RawError]
 
@@ -41,19 +29,8 @@ pub struct Channel {
   // private fields
 }
 
-pub(all) struct ConversionCounters {
-  bytes_to_buffer : Int
-  buffer_to_bytes : Int
-}
-pub impl Eq for ConversionCounters
-pub impl Show for ConversionCounters
-pub impl ToJson for ConversionCounters
-
 #external
 pub type JsChannel
-
-#external
-pub type JsTestServer
 
 #external
 pub type JsUnaryCall
@@ -122,12 +99,6 @@ pub(all) enum RawUnaryOutcome {
 pub impl Eq for RawUnaryOutcome
 pub impl Show for RawUnaryOutcome
 pub impl ToJson for RawUnaryOutcome
-
-pub struct TestServer {
-  // private fields
-}
-pub fn TestServer::port(Self) -> Int
-pub async fn TestServer::stop(Self) -> Unit
 
 pub struct UnaryCall {
   // private fields

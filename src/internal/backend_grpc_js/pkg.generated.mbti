@@ -33,6 +33,12 @@ pub struct Channel {
 pub type JsChannel
 
 #external
+pub type JsNewChannelResult
+
+#external
+pub type JsStartUnaryResult
+
+#external
 pub type JsUnaryCall
 
 #external

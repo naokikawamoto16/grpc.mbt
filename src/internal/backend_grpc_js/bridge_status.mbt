@@ -26,13 +26,15 @@ let grpc_internal : Int = 13
 
 ///|
 fn normalize_raw_kind(kind : String, code : Int) -> String {
-  if kind.length() > 0 {
-    return kind
-  }
-  if code == grpc_cancelled {
+  let is_generic_kind = kind.length() == 0 ||
+    kind == "status" ||
+    kind == "transport"
+  if is_generic_kind && code == grpc_cancelled {
     "cancelled"
-  } else if code == grpc_deadline_exceeded {
+  } else if is_generic_kind && code == grpc_deadline_exceeded {
     "timeout"
+  } else if kind.length() > 0 {
+    kind
   } else {
     "status"
   }

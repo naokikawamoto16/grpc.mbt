@@ -70,8 +70,20 @@ pub async fn BackendTest::generate_test_tls_material() -> (Bytes, Bytes) {
     ignore(signal)
     ffi_generate_test_tls_material()
   })
-  if generated.length() < 2 {
-    panic()
+  if generated.length() != 2 {
+    abort("ffi_generate_test_tls_material must return exactly 2 items")
   }
   (generated[0], generated[1])
+}
+
+///|
+/// Test-only hook to force the next grpc-js unary start to throw on the client side.
+pub fn BackendTest::inject_next_client_start_unary_exception() -> Unit {
+  ffi_inject_next_client_start_unary_exception()
+}
+
+///|
+/// Restore grpc-js client unary-start exception injection if it is still armed.
+pub fn BackendTest::restore_client_start_unary_exception_injection() -> Unit {
+  ffi_restore_client_start_unary_exception_injection()
 }

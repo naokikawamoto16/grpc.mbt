@@ -24,6 +24,7 @@ pub(all) struct RawCallOptions {
 pub struct UnaryCall {
   priv inner : JsUnaryCall
   priv mut cached : RawUnaryOutcome?
+  priv mut awaiting : Bool
 }
 
 ///|
@@ -46,6 +47,35 @@ fn internal_raw_error(
 }
 
 ///|
+extern "js" fn ffi_error_string_lossy(err : Error) -> String =
+  #| (err) => {
+  #|   try {
+  #|     if (err == null) {
+  #|       return "null";
+  #|     }
+  #|     if (typeof err === "string") {
+  #|       return err;
+  #|     }
+  #|     if (typeof err.message === "string" && err.message.length > 0) {
+  #|       return err.message;
+  #|     }
+  #|     return String(err);
+  #|   } catch (_) {
+  #|     return "failed to stringify error";
+  #|   }
+  #| }
+
+///|
+fn safe_error_string(err : Error) -> String {
+  ffi_error_string_lossy(err)
+}
+
+///|
+fn start_unary_exception_error(details : String?) -> RawError {
+  internal_raw_error("failed to start unary call", details, kind="transport")
+}
+
+///|
 pub fn start_unary(
   channel : Channel,
   path : String,
@@ -65,7 +95,15 @@ pub fn start_unary(
     options.timeout_ms,
     options.wait_for_ready,
   )
-  Ok({ inner: started, cached: None })
+  if ffi_start_unary_result_is_ok(started) {
+    Ok({
+      inner: ffi_start_unary_result_call(started),
+      cached: None,
+      awaiting: false,
+    })
+  } else {
+    Err(start_unary_exception_error(ffi_start_unary_result_error(started)))
+  }
 }
 
 ///|
@@ -83,7 +121,7 @@ pub fn[Req] start_unary_with_codec(
       Err(
         internal_raw_error(
           "codec encode failed",
-          Some(err.to_string()),
+          Some(safe_error_string(err)),
           kind="codec_encode",
         ),
       )

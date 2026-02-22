@@ -36,6 +36,55 @@ extern "js" fn ffi_get_conversion_counters() -> Array[Int] =
   #| }
 
 ///|
+extern "js" fn ffi_inject_next_client_start_unary_exception() =
+  #| () => {
+  #|   const grpc = require("@grpc/grpc-js");
+  #|   const proto = grpc?.Client?.prototype;
+  #|   if (!proto || typeof proto.makeUnaryRequest !== "function") {
+  #|     throw new Error("grpc-js Client.makeUnaryRequest is not available");
+  #|   }
+  #|   const armedKey = "__grpcTestNextUnaryStartExceptionArmed";
+  #|   const originalKey = "__grpcTestOriginalMakeUnaryRequest";
+  #|   const restore = () => {
+  #|     const original = proto[originalKey];
+  #|     if (typeof original === "function") {
+  #|       proto.makeUnaryRequest = original;
+  #|       delete proto[originalKey];
+  #|     }
+  #|     proto[armedKey] = false;
+  #|   };
+  #|   if (proto[armedKey]) {
+  #|     return;
+  #|   }
+  #|   if (typeof proto[originalKey] !== "function") {
+  #|     proto[originalKey] = proto.makeUnaryRequest;
+  #|   }
+  #|   proto[armedKey] = true;
+  #|   proto.makeUnaryRequest = function (..._args) {
+  #|     restore();
+  #|     throw new Error("forced js exception");
+  #|   };
+  #| }
+
+///|
+extern "js" fn ffi_restore_client_start_unary_exception_injection() =
+  #| () => {
+  #|   const grpc = require("@grpc/grpc-js");
+  #|   const proto = grpc?.Client?.prototype;
+  #|   if (!proto) {
+  #|     return;
+  #|   }
+  #|   const armedKey = "__grpcTestNextUnaryStartExceptionArmed";
+  #|   const originalKey = "__grpcTestOriginalMakeUnaryRequest";
+  #|   const original = proto[originalKey];
+  #|   if (typeof original === "function") {
+  #|     proto.makeUnaryRequest = original;
+  #|     delete proto[originalKey];
+  #|   }
+  #|   proto[armedKey] = false;
+  #| }
+
+///|
 extern "js" fn ffi_read_text_file(path : String) -> @js_async.Promise[String] =
   #| async (path) => {
   #|   const content = await require("node:fs/promises").readFile(path, "utf8");
@@ -127,6 +176,24 @@ extern "js" fn ffi_test_server_start(
   #|         const sleepMs = Number.parseInt(text.slice(first + 1, second), 10);
   #|         const payload = text.slice(second + 1);
   #|         setTimeout(() => callback(null, Buffer.from(payload, "utf8")), Number.isInteger(sleepMs) ? sleepMs : 0);
+  #|         return;
+  #|       }
+  #|       if (text === "metadata:echo") {
+  #|         try {
+  #|           const getText = (key) => (call.metadata.get(key) || []).map((v) => String(v));
+  #|           const getBinary = (key) =>
+  #|             (call.metadata.get(key) || []).map((v) => Buffer.from(v).toString("hex"));
+  #|           const reflected = [
+  #|             `x-request-id=${getText("x-request-id").join(",")}`,
+  #|             `x-tag=${getText("x-tag").join(",")}`,
+  #|             `x-empty=${getText("x-empty").join(",")}`,
+  #|             `trace-bin=${getBinary("trace-bin").join(",")}`,
+  #|             `empty-bin=${getBinary("empty-bin").join(",")}`,
+  #|           ].join(";");
+  #|           callback(null, Buffer.from(reflected, "utf8"));
+  #|         } catch (err) {
+  #|           callback(err);
+  #|         }
   #|         return;
   #|       }
   #|       callback(null, request);

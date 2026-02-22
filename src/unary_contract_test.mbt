@@ -218,18 +218,50 @@ async test "Task cancellation normalizes to cancelled result" {
 }
 
 ///|
+async test "Retry wait immediately after timeout does not return internal error" {
+  let setup = new_insecure_client()
+  let client = setup.0
+  let channel = setup.1
+  let server = setup.2
+  let descriptor = MethodDescriptor::new(
+    "test.EchoService",
+    "Echo",
+    utf8_codec(),
+  ).unwrap()
+  let call = client.start_unary(descriptor, "sleep:200:done")
+
+  let timed = @async.with_timeout_opt(10, () => call.wait())
+  assert_eq(timed, None)
+
+  let retried = call.wait()
+  match retried {
+    Ok(_) => panic()
+    Err(err) => {
+      assert_true(err.kind != Internal)
+      assert_eq(err.code, Cancelled)
+      assert_eq(err.kind, Cancelled)
+    }
+  }
+
+  channel.close()
+  server.stop()
+}
+
+///|
 async test "Unknown JS exception is normalized to RpcError" {
   let setup = new_insecure_client()
   let client = setup.0
   let channel = setup.1
   let server = setup.2
+  @backend_test_util.BackendTest::inject_next_client_start_unary_exception()
   let descriptor : MethodDescriptor[String, String] = {
     service: "test.EchoService",
     method_name: "Echo",
-    path: "/__internal__/throw_js_exception",
+    path: "/test.EchoService/Echo",
     codec: utf8_codec(),
   }
   let result = client.unary(descriptor, "hello")
+  @backend_test_util.BackendTest::restore_client_start_unary_exception_injection()
   match result {
     Ok(_) => panic()
     Err(err) => {

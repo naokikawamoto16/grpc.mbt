@@ -10,8 +10,10 @@ pub(all) struct BackendTest {
 }
 pub fn BackendTest::conversion_counters() -> ConversionCounters
 pub async fn BackendTest::generate_test_tls_material() -> (Bytes, Bytes)
+pub fn BackendTest::inject_next_client_start_unary_exception() -> Unit
 pub async fn BackendTest::read_text_file(String) -> String
 pub fn BackendTest::reset_conversion_counters() -> Unit
+pub fn BackendTest::restore_client_start_unary_exception_injection() -> Unit
 pub async fn BackendTest::start_test_server_insecure() -> TestServer
 pub async fn BackendTest::start_test_server_tls(Bytes, Bytes) -> TestServer
 

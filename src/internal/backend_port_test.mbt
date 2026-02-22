@@ -39,6 +39,25 @@ fn call_options_for_test() -> BackendCallOptions {
 }
 
 ///|
+fn call_options_with_metadata_for_test() -> BackendCallOptions {
+  {
+    metadata_text: [
+      ("x-request-id", ["req-1", "req-2"]),
+      ("x-empty", []),
+      ("x-tag", ["alpha"]),
+      ("x-request-id", ["req-3"]),
+    ],
+    metadata_binary: [
+      ("trace-bin", [b"\x01\x02", b"\x03"]),
+      ("empty-bin", []),
+      ("trace-bin", [b"\x04\x05"]),
+    ],
+    timeout_ms: None,
+    wait_for_ready: false,
+  }
+}
+
+///|
 fn to_impl_channel_options_for_test(
   options : BackendChannelOptions,
 ) -> @impl.RawChannelOptions {
@@ -136,4 +155,31 @@ async test "backend_port unary keeps cancel idempotency and codec decode normali
 
   close_channel(channel)
   server.stop()
+}
+
+///|
+async test "backend_port unary forwards text and binary metadata values" {
+  let server = @backend_test_util.BackendTest::start_test_server_insecure()
+  let target = "127.0.0.1:\{server.port()}"
+  let channel = new_channel(target, insecure_channel_options_for_test()).unwrap()
+  let call = start_unary(
+    channel,
+    "/test.EchoService/Echo",
+    "metadata:echo",
+    text => @utf8.encode(text),
+    bytes => @utf8.decode(bytes),
+    call_options_with_metadata_for_test(),
+  ).unwrap()
+
+  let result = await_unary(call)
+  close_channel(channel)
+  server.stop()
+
+  match result {
+    Ok(response) =>
+      assert_eq(
+        response, "x-request-id=req-1, req-2, req-3;x-tag=alpha;x-empty=;trace-bin=0102,03,0405;empty-bin=",
+      )
+    Err(_) => panic()
+  }
 }

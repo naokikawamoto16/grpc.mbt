@@ -36,8 +36,11 @@ extern "js" fn ffi_get_conversion_counters() -> Array[Int] =
   #| }
 
 ///|
-extern "js" fn ffi_inject_next_client_start_unary_exception() =
-  #| () => {
+extern "js" fn ffi_inject_next_client_start_unary_exception(
+  marker_key : String,
+  marker_value : String,
+) =
+  #| (marker_key, marker_value) => {
   #|   const grpc = require("@grpc/grpc-js");
   #|   const proto = grpc?.Client?.prototype;
   #|   if (!proto || typeof proto.makeUnaryRequest !== "function") {
@@ -45,6 +48,8 @@ extern "js" fn ffi_inject_next_client_start_unary_exception() =
   #|   }
   #|   const armedKey = "__grpcTestNextUnaryStartExceptionArmed";
   #|   const originalKey = "__grpcTestOriginalMakeUnaryRequest";
+  #|   const markerKeyKey = "__grpcTestNextUnaryStartExceptionMarkerKey";
+  #|   const markerValueKey = "__grpcTestNextUnaryStartExceptionMarkerValue";
   #|   const restore = () => {
   #|     const original = proto[originalKey];
   #|     if (typeof original === "function") {
@@ -52,15 +57,40 @@ extern "js" fn ffi_inject_next_client_start_unary_exception() =
   #|       delete proto[originalKey];
   #|     }
   #|     proto[armedKey] = false;
+  #|     delete proto[markerKeyKey];
+  #|     delete proto[markerValueKey];
   #|   };
   #|   if (proto[armedKey]) {
-  #|     return;
+  #|     throw new Error("grpc-js Client.makeUnaryRequest exception injection is already armed");
   #|   }
   #|   if (typeof proto[originalKey] !== "function") {
   #|     proto[originalKey] = proto.makeUnaryRequest;
   #|   }
   #|   proto[armedKey] = true;
+  #|   proto[markerKeyKey] = String(marker_key);
+  #|   proto[markerValueKey] = String(marker_value);
   #|   proto.makeUnaryRequest = function (..._args) {
+  #|     const original = proto[originalKey];
+  #|     if (typeof original !== "function") {
+  #|       restore();
+  #|       throw new Error("grpc-js original makeUnaryRequest is not available");
+  #|     }
+  #|     const metadata = _args[4];
+  #|     const scopedMarkerKey = proto[markerKeyKey];
+  #|     const scopedMarkerValue = proto[markerValueKey];
+  #|     let shouldThrow = false;
+  #|     if (
+  #|       metadata &&
+  #|       typeof metadata.get === "function" &&
+  #|       typeof scopedMarkerKey === "string" &&
+  #|       typeof scopedMarkerValue === "string"
+  #|     ) {
+  #|       const values = metadata.get(scopedMarkerKey) || [];
+  #|       shouldThrow = values.some((value) => String(value) === scopedMarkerValue);
+  #|     }
+  #|     if (!shouldThrow) {
+  #|       return original.apply(this, _args);
+  #|     }
   #|     restore();
   #|     throw new Error("forced js exception");
   #|   };
@@ -76,12 +106,16 @@ extern "js" fn ffi_restore_client_start_unary_exception_injection() =
   #|   }
   #|   const armedKey = "__grpcTestNextUnaryStartExceptionArmed";
   #|   const originalKey = "__grpcTestOriginalMakeUnaryRequest";
+  #|   const markerKeyKey = "__grpcTestNextUnaryStartExceptionMarkerKey";
+  #|   const markerValueKey = "__grpcTestNextUnaryStartExceptionMarkerValue";
   #|   const original = proto[originalKey];
   #|   if (typeof original === "function") {
   #|     proto.makeUnaryRequest = original;
   #|     delete proto[originalKey];
   #|   }
   #|   proto[armedKey] = false;
+  #|   delete proto[markerKeyKey];
+  #|   delete proto[markerValueKey];
   #| }
 
 ///|
@@ -238,8 +272,25 @@ extern "js" fn ffi_test_server_stop(
   server : JsTestServer,
 ) -> @js_async.Promise[Unit] =
   #| (server) =>
-  #|   new Promise((resolve) => {
-  #|     server.server.tryShutdown(() => {
-  #|       resolve();
-  #|     });
+  #|   new Promise((resolve, reject) => {
+  #|     const rawServer = server?.server;
+  #|     if (!rawServer) {
+  #|       reject(new Error("grpc-js test server wrapper is invalid"));
+  #|       return;
+  #|     }
+  #|     if (typeof rawServer.tryShutdown !== "function") {
+  #|       reject(new Error("grpc-js Server.tryShutdown is not available"));
+  #|       return;
+  #|     }
+  #|     try {
+  #|       rawServer.tryShutdown((error) => {
+  #|         if (error) {
+  #|           reject(error instanceof Error ? error : new Error(String(error)));
+  #|           return;
+  #|         }
+  #|         resolve();
+  #|       });
+  #|     } catch (error) {
+  #|       reject(error instanceof Error ? error : new Error(String(error)));
+  #|     }
   #|   })

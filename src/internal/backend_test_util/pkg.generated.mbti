@@ -8,9 +8,10 @@ package "naokikawamoto16/grpc/internal/backend_test_util"
 // Types and methods
 pub(all) struct BackendTest {
 }
+pub fn BackendTest::client_start_unary_exception_marker_key() -> String
 pub fn BackendTest::conversion_counters() -> ConversionCounters
 pub async fn BackendTest::generate_test_tls_material() -> (Bytes, Bytes)
-pub fn BackendTest::inject_next_client_start_unary_exception() -> Unit
+pub fn BackendTest::inject_next_client_start_unary_exception(String) -> Unit
 pub async fn BackendTest::read_text_file(String) -> String
 pub fn BackendTest::reset_conversion_counters() -> Unit
 pub fn BackendTest::restore_client_start_unary_exception_injection() -> Unit

@@ -21,6 +21,11 @@ pub(all) struct TestServer {
 }
 
 ///|
+let client_start_unary_exception_marker_key : String = "x-grpc-test-js-exception-marker"
+
+///|
+/// Start a test-only grpc-js server with insecure credentials.
+/// The server binds to `127.0.0.1` on an OS-assigned port.
 pub async fn BackendTest::start_test_server_insecure() -> TestServer {
   let inner = @js_async.run_promise(signal => {
     ignore(signal)
@@ -30,6 +35,8 @@ pub async fn BackendTest::start_test_server_insecure() -> TestServer {
 }
 
 ///|
+/// Start a test-only grpc-js server with TLS credentials.
+/// The server binds to `127.0.0.1` on an OS-assigned port.
 pub async fn BackendTest::start_test_server_tls(
   cert_chain : Bytes,
   private_key : Bytes,
@@ -42,11 +49,14 @@ pub async fn BackendTest::start_test_server_tls(
 }
 
 ///|
+/// Return the bound port of this test server.
 pub fn TestServer::port(self : TestServer) -> Int {
   ffi_test_server_port(self.inner)
 }
 
 ///|
+/// Stop this test server asynchronously.
+/// Shutdown errors from the FFI layer are propagated.
 pub async fn TestServer::stop(self : TestServer) -> Unit {
   ignore(
     @js_async.run_promise(signal => {
@@ -57,6 +67,7 @@ pub async fn TestServer::stop(self : TestServer) -> Unit {
 }
 
 ///|
+/// Read a UTF-8 text file for tests.
 pub async fn BackendTest::read_text_file(path : String) -> String {
   @js_async.run_promise(signal => {
     ignore(signal)
@@ -65,21 +76,33 @@ pub async fn BackendTest::read_text_file(path : String) -> String {
 }
 
 ///|
+/// Generate temporary TLS material for tests.
+/// Returns `(cert_chain, private_key)` and aborts on an invalid FFI result shape.
 pub async fn BackendTest::generate_test_tls_material() -> (Bytes, Bytes) {
-  let generated = @js_async.run_promise(signal => {
+  let materials = @js_async.run_promise(signal => {
     ignore(signal)
     ffi_generate_test_tls_material()
   })
-  if generated.length() != 2 {
+  if materials.length() != 2 {
     abort("ffi_generate_test_tls_material must return exactly 2 items")
   }
-  (generated[0], generated[1])
+  (materials[0], materials[1])
 }
 
 ///|
-/// Test-only hook to force the next grpc-js unary start to throw on the client side.
-pub fn BackendTest::inject_next_client_start_unary_exception() -> Unit {
-  ffi_inject_next_client_start_unary_exception()
+/// Return the metadata key used to scope client unary-start exception injection.
+pub fn BackendTest::client_start_unary_exception_marker_key() -> String {
+  client_start_unary_exception_marker_key
+}
+
+///|
+/// Test-only hook to force a marked grpc-js unary start to throw on the client side.
+pub fn BackendTest::inject_next_client_start_unary_exception(
+  marker_value : String,
+) -> Unit {
+  ffi_inject_next_client_start_unary_exception(
+    client_start_unary_exception_marker_key, marker_value,
+  )
 }
 
 ///|

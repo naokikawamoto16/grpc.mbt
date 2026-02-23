@@ -253,14 +253,25 @@ async test "Unknown JS exception is normalized to RpcError" {
   let client = setup.0
   let channel = setup.1
   let server = setup.2
-  @backend_test_util.BackendTest::inject_next_client_start_unary_exception()
+  let marker_key = @backend_test_util.BackendTest::client_start_unary_exception_marker_key()
+  let marker_value = "normalize-error-test"
+  @backend_test_util.BackendTest::inject_next_client_start_unary_exception(
+    marker_value,
+  )
   let descriptor : MethodDescriptor[String, String] = {
     service: "test.EchoService",
     method_name: "Echo",
     path: "/test.EchoService/Echo",
     codec: utf8_codec(),
   }
-  let result = client.unary(descriptor, "hello")
+  let metadata = Metadata::new()
+  ignore(metadata.add_text(marker_key, marker_value).unwrap())
+  let options : CallOptions = {
+    metadata,
+    timeout_ms: None,
+    wait_for_ready: false,
+  }
+  let result = client.unary(descriptor, "hello", options~)
   @backend_test_util.BackendTest::restore_client_start_unary_exception_injection()
   match result {
     Ok(_) => panic()

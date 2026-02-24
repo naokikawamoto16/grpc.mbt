@@ -13,11 +13,13 @@
 // limitations under the License.
 
 ///|
-pub(all) enum DebugEvent {
+priv enum DebugEvent {
   CancelTriggered
-} derive(Show, Eq, ToJson)
+}
 
 ///|
+/// Internal debug instrumentation hook.
+/// Intentionally a no-op by default and kept as an extension point for temporary debugging.
 fn emit_debug_event(_event : DebugEvent) -> Unit {
   ()
 }

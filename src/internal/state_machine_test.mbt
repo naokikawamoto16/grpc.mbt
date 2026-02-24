@@ -15,7 +15,14 @@
 ///|
 test "FinishOnce prevents double completion" {
   let finish_once : FinishOnce[Int] = FinishOnce::new()
+  assert_true(!finish_once.is_done())
+  assert_eq(finish_once.get(), None)
+
   assert_true(finish_once.finish(10))
+  assert_true(finish_once.is_done())
+  assert_eq(finish_once.get(), Some(10))
+
   assert_true(!finish_once.finish(20))
+  assert_true(finish_once.is_done())
   assert_eq(finish_once.get(), Some(10))
 }

@@ -40,17 +40,33 @@ pub(all) struct BackendChannelOptions {
 }
 pub impl Eq for BackendChannelOptions
 
-pub struct BackendError {
+pub(all) struct BackendError {
   code : Int
   message : String
   details : String?
   metadata_text : Array[(String, Array[String])]
   metadata_binary : Array[(String, Array[Bytes])]
-  kind : String
+  kind : BackendErrorKind
 }
 pub impl Eq for BackendError
 pub impl Show for BackendError
 pub impl ToJson for BackendError
+
+pub(all) enum BackendErrorKind {
+  Status
+  Transport
+  Timeout
+  Cancelled
+  CodecEncode
+  CodecDecode
+  ChannelClosed
+  InvalidUsage
+  Internal
+  Unknown(String)
+}
+pub impl Eq for BackendErrorKind
+pub impl Show for BackendErrorKind
+pub impl ToJson for BackendErrorKind
 
 pub(all) enum BackendSecurity {
   Insecure
@@ -67,26 +83,19 @@ pub(all) struct BackendTlsOptions {
 }
 pub impl Eq for BackendTlsOptions
 
-pub struct ChannelHandle {
+pub(all) struct ChannelHandle {
   // private fields
 }
 
-pub(all) enum DebugEvent {
-  CancelTriggered
-}
-pub impl Eq for DebugEvent
-pub impl Show for DebugEvent
-pub impl ToJson for DebugEvent
-
 pub struct FinishOnce[T] {
-  mut value : T?
+  // private fields
 }
 pub fn[T] FinishOnce::finish(Self[T], T) -> Bool
 pub fn[T] FinishOnce::get(Self[T]) -> T?
 pub fn[T] FinishOnce::is_done(Self[T]) -> Bool
 pub fn[T] FinishOnce::new() -> Self[T]
 
-pub struct UnaryHandle[Resp] {
+pub(all) struct UnaryHandle[Resp] {
   // private fields
 }
 

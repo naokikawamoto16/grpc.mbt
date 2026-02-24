@@ -58,128 +58,323 @@ fn call_options_with_metadata_for_test() -> BackendCallOptions {
 }
 
 ///|
-fn to_impl_channel_options_for_test(
-  options : BackendChannelOptions,
-) -> @impl.RawChannelOptions {
-  let security = match options.security {
-    Insecure => @impl.Insecure
-    Tls(raw_tls) =>
-      @impl.Tls({
-        root_certs: raw_tls.root_certs,
-        private_key: raw_tls.private_key,
-        cert_chain: raw_tls.cert_chain,
-        server_name_override: raw_tls.server_name_override,
-        reject_unauthorized: raw_tls.reject_unauthorized,
-      })
-  }
-  {
-    security,
-    max_send_message_length: options.max_send_message_length,
-    max_receive_message_length: options.max_receive_message_length,
-    keepalive_time_ms: options.keepalive_time_ms,
-    keepalive_timeout_ms: options.keepalive_timeout_ms,
-    default_authority: options.default_authority,
-    user_agent: options.user_agent,
-  }
-}
-
-///|
 fn decode_fail(_ : Bytes) -> String raise {
   raise DecodeFail
 }
 
 ///|
-async test "backend_port new_channel matches impl result shape" {
+async test "backend_port new_channel accepts populated insecure options" {
   let server = @backend_test_util.BackendTest::start_test_server_insecure()
   let target = "127.0.0.1:\{server.port()}"
-  let options = insecure_channel_options_for_test()
-  let facade = new_channel(target, options)
-  let direct = @impl.new_channel(
-    target,
-    to_impl_channel_options_for_test(options),
-  )
-
-  match (facade, direct) {
-    (Ok(channel), Ok(raw_channel)) => {
-      assert_eq(is_channel_closed(channel), false)
-      assert_eq(@impl.is_channel_closed(raw_channel), false)
-      close_channel(channel)
-      @impl.close_channel(raw_channel)
-    }
-    (Err(lhs), Err(rhs)) => {
-      assert_eq(lhs.kind, "transport")
-      assert_eq(lhs.message, rhs)
-    }
-    _ => panic()
+  let options : BackendChannelOptions = {
+    security: Insecure,
+    max_send_message_length: Some(1),
+    max_receive_message_length: Some(2),
+    keepalive_time_ms: Some(3),
+    keepalive_timeout_ms: Some(4),
+    default_authority: Some("authority.example"),
+    user_agent: Some("grpc-test/1.0"),
   }
+  let result = new_channel(target, options)
 
-  server.stop()
+  match result {
+    Ok(channel) => {
+      let open_before_close = is_channel_closed(channel)
+      server.stop()
+      close_channel(channel)
+      let closed_after_close = is_channel_closed(channel)
+      close_channel(channel)
+      assert_eq(open_before_close, false)
+      assert_eq(closed_after_close, true)
+    }
+    Err(_) => {
+      server.stop()
+      panic()
+    }
+  }
 }
 
 ///|
-async test "backend_port unary keeps cancel idempotency and codec decode normalization" {
+async test "backend_port new_channel accepts populated tls options" {
+  let tls_material = @backend_test_util.BackendTest::generate_test_tls_material()
+  let cert_chain = tls_material.0
+  let private_key = tls_material.1
+  let server = @backend_test_util.BackendTest::start_test_server_tls(
+    cert_chain, private_key,
+  )
+  let target = "127.0.0.1:\{server.port()}"
+  let options : BackendChannelOptions = {
+    security: Tls({
+      root_certs: Some(cert_chain),
+      private_key: Some(private_key),
+      cert_chain: Some(cert_chain),
+      server_name_override: Some("localhost"),
+      reject_unauthorized: Some(true),
+    }),
+    max_send_message_length: Some(10),
+    max_receive_message_length: Some(20),
+    keepalive_time_ms: Some(30),
+    keepalive_timeout_ms: Some(40),
+    default_authority: Some("localhost"),
+    user_agent: Some("grpc-test/2.0"),
+  }
+  let result = new_channel(target, options)
+
+  match result {
+    Ok(channel) => {
+      let open_before_close = is_channel_closed(channel)
+      server.stop()
+      close_channel(channel)
+      let closed_after_close = is_channel_closed(channel)
+      close_channel(channel)
+      assert_eq(open_before_close, false)
+      assert_eq(closed_after_close, true)
+    }
+    Err(_) => {
+      server.stop()
+      panic()
+    }
+  }
+}
+
+///|
+async test "backend_port unary cancel is idempotent" {
   let server = @backend_test_util.BackendTest::start_test_server_insecure()
   let target = "127.0.0.1:\{server.port()}"
-  let channel = new_channel(target, insecure_channel_options_for_test()).unwrap()
-  let call_options = call_options_for_test()
+  let channel_result = new_channel(target, insecure_channel_options_for_test())
 
-  let cancel_call = start_unary(
-    channel,
-    "/test.EchoService/Echo",
-    "sleep:200:done",
-    text => @utf8.encode(text),
-    bytes => @utf8.decode(bytes),
-    call_options,
-  ).unwrap()
-  cancel_unary(cancel_call)
-  cancel_unary(cancel_call)
-  let cancelled = await_unary(cancel_call)
-  match cancelled {
-    Ok(_) => panic()
-    Err(error) => assert_eq(error.kind, "cancelled")
+  match channel_result {
+    Err(_) => {
+      server.stop()
+      panic()
+    }
+    Ok(channel) => {
+      let start_result = start_unary(
+        channel,
+        "/test.EchoService/Echo",
+        "sleep:5000:done",
+        text => @utf8.encode(text),
+        bytes => @utf8.decode(bytes),
+        call_options_for_test(),
+      )
+      match start_result {
+        Err(_) => {
+          close_channel(channel)
+          server.stop()
+          panic()
+        }
+        Ok(cancel_call) => {
+          let done_before_cancel = is_unary_done(cancel_call)
+          cancel_unary(cancel_call)
+          cancel_unary(cancel_call)
+          let cancelled = await_unary(cancel_call)
+          close_channel(channel)
+          server.stop()
+
+          assert_eq(done_before_cancel, false)
+          match cancelled {
+            Ok(_) => panic()
+            Err(error) => {
+              assert_eq(error.code, 1)
+              assert_eq(error.kind, Cancelled)
+            }
+          }
+        }
+      }
+    }
   }
+}
 
-  let decode_call = start_unary(
-    channel,
-    "/test.EchoService/Echo",
-    "hello",
-    text => @utf8.encode(text),
-    decode_fail,
-    call_options,
-  ).unwrap()
-  let decoded = await_unary(decode_call)
-  match decoded {
-    Ok(_) => panic()
-    Err(error) => assert_eq(error.kind, "codec_decode")
+///|
+async test "backend_port unary codec decode failure is normalized" {
+  let server = @backend_test_util.BackendTest::start_test_server_insecure()
+  let target = "127.0.0.1:\{server.port()}"
+  let channel_result = new_channel(target, insecure_channel_options_for_test())
+
+  match channel_result {
+    Err(_) => {
+      server.stop()
+      panic()
+    }
+    Ok(channel) => {
+      let start_result = start_unary(
+        channel,
+        "/test.EchoService/Echo",
+        "hello",
+        text => @utf8.encode(text),
+        decode_fail,
+        call_options_for_test(),
+      )
+      match start_result {
+        Err(_) => {
+          close_channel(channel)
+          server.stop()
+          panic()
+        }
+        Ok(call) => {
+          let decoded = await_unary(call)
+          close_channel(channel)
+          server.stop()
+
+          match decoded {
+            Ok(_) => panic()
+            Err(error) => {
+              assert_eq(error.code, 13)
+              assert_eq(error.kind, CodecDecode)
+              assert_eq(error.message, "codec decode failed")
+              assert_true(error.details is Some(_))
+              assert_eq(error.metadata_text, [])
+              assert_eq(error.metadata_binary, [])
+            }
+          }
+        }
+      }
+    }
   }
-
-  close_channel(channel)
-  server.stop()
 }
 
 ///|
 async test "backend_port unary forwards text and binary metadata values" {
   let server = @backend_test_util.BackendTest::start_test_server_insecure()
   let target = "127.0.0.1:\{server.port()}"
-  let channel = new_channel(target, insecure_channel_options_for_test()).unwrap()
-  let call = start_unary(
-    channel,
-    "/test.EchoService/Echo",
-    "metadata:echo",
-    text => @utf8.encode(text),
-    bytes => @utf8.decode(bytes),
-    call_options_with_metadata_for_test(),
-  ).unwrap()
+  let channel_result = new_channel(target, insecure_channel_options_for_test())
 
-  let result = await_unary(call)
-  close_channel(channel)
-  server.stop()
-
-  match result {
-    Ok(response) =>
-      assert_eq(
-        response, "x-request-id=req-1, req-2, req-3;x-tag=alpha;x-empty=;trace-bin=0102,03,0405;empty-bin=",
+  match channel_result {
+    Err(_) => {
+      server.stop()
+      panic()
+    }
+    Ok(channel) => {
+      let start_result = start_unary(
+        channel,
+        "/test.EchoService/Echo",
+        "metadata:echo",
+        text => @utf8.encode(text),
+        bytes => @utf8.decode(bytes),
+        call_options_with_metadata_for_test(),
       )
-    Err(_) => panic()
+      match start_result {
+        Err(_) => {
+          close_channel(channel)
+          server.stop()
+          panic()
+        }
+        Ok(call) => {
+          let result = await_unary(call)
+          close_channel(channel)
+          server.stop()
+
+          match result {
+            Ok(response) =>
+              assert_eq(
+                response, "x-request-id=req-1, req-2, req-3;x-tag=alpha;x-empty=;trace-bin=0102,03,0405;empty-bin=",
+              )
+            Err(_) => panic()
+          }
+        }
+      }
+    }
+  }
+}
+
+///|
+async test "backend_port await_unary caches result for sequential calls" {
+  let server = @backend_test_util.BackendTest::start_test_server_insecure()
+  let target = "127.0.0.1:\{server.port()}"
+  let channel_result = new_channel(target, insecure_channel_options_for_test())
+
+  match channel_result {
+    Err(_) => {
+      server.stop()
+      panic()
+    }
+    Ok(channel) => {
+      let mut decode_calls = 0
+      let start_result = start_unary(
+        channel,
+        "/test.EchoService/Echo",
+        "cached",
+        text => @utf8.encode(text),
+        bytes => {
+          decode_calls = decode_calls + 1
+          if decode_calls > 1 {
+            raise DecodeFail
+          }
+          @utf8.decode(bytes)
+        },
+        call_options_for_test(),
+      )
+      match start_result {
+        Err(_) => {
+          close_channel(channel)
+          server.stop()
+          panic()
+        }
+        Ok(call) => {
+          let first = await_unary(call)
+          let second = await_unary(call)
+          close_channel(channel)
+          server.stop()
+
+          assert_eq(first, Ok("cached"))
+          assert_eq(second, Ok("cached"))
+          assert_eq(decode_calls, 1)
+        }
+      }
+    }
+  }
+}
+
+///|
+async test "backend_port await_unary rejects concurrent waits" {
+  let server = @backend_test_util.BackendTest::start_test_server_insecure()
+  let target = "127.0.0.1:\{server.port()}"
+  let channel_result = new_channel(target, insecure_channel_options_for_test())
+
+  match channel_result {
+    Err(_) => {
+      server.stop()
+      panic()
+    }
+    Ok(channel) => {
+      let start_result = start_unary(
+        channel,
+        "/test.EchoService/Echo",
+        "sleep:50:done",
+        text => @utf8.encode(text),
+        bytes => @utf8.decode(bytes),
+        call_options_for_test(),
+      )
+      match start_result {
+        Err(_) => {
+          close_channel(channel)
+          server.stop()
+          panic()
+        }
+        Ok(call) => {
+          let waits : Array[async () -> Result[String, BackendError]] = [
+            () => await_unary(call),
+            () => await_unary(call),
+          ]
+          let results = @async.all(waits)
+          close_channel(channel)
+          server.stop()
+
+          let success_count = results
+            .filter(result => result == Ok("done"))
+            .length()
+          let concurrent_errors = results.filter(result => {
+            match result {
+              Err(error) =>
+                error.kind == InvalidUsage &&
+                error.message == "concurrent unary wait is not supported"
+              Ok(_) => false
+            }
+          })
+          assert_eq(success_count, 1)
+          assert_eq(concurrent_errors.length(), 1)
+        }
+      }
+    }
   }
 }

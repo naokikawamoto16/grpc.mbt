@@ -59,7 +59,7 @@ pub fn new_channel(
 ) -> Result[ChannelHandle, BackendError] {
   match @impl.new_channel(target, to_impl_channel_options(options)) {
     Ok(channel) => Ok({ inner: channel })
-    Err(message) => Err(message_error(message, kind="transport"))
+    Err(message) => Err(message_error(message, kind=Transport))
   }
 }
 
@@ -71,6 +71,11 @@ pub fn close_channel(channel : ChannelHandle) -> Unit {
 ///|
 pub fn is_channel_closed(channel : ChannelHandle) -> Bool {
   @impl.is_channel_closed(channel.inner)
+}
+
+///|
+fn concurrent_unary_wait_error() -> BackendError {
+  message_error("concurrent unary wait is not supported", kind=InvalidUsage)
 }
 
 ///|
@@ -90,7 +95,8 @@ pub fn[Req, Resp] start_unary(
       encode,
       to_impl_call_options(options),
     ) {
-    Ok(call) => Ok({ inner: call, done: FinishOnce::new(), decode })
+    Ok(call) =>
+      Ok({ inner: call, done: FinishOnce::new(), awaiting: false, decode })
     Err(error) => Err(from_raw_error(error))
   }
 }
@@ -107,15 +113,22 @@ pub fn[Resp] is_unary_done(call : UnaryHandle[Resp]) -> Bool {
 }
 
 ///|
+/// Wait for unary completion and cache the terminal result.
+/// Concurrent waits on the same handle are not supported and return an error.
 pub async fn[Resp] await_unary(
   call : UnaryHandle[Resp],
 ) -> Result[Resp, BackendError] {
   if call.done.get() is Some(result) {
     return result
   }
+  if call.awaiting {
+    return Err(concurrent_unary_wait_error())
+  }
+  call.awaiting = true
   let result = @impl.await_unary_with_codec(call.inner, call.decode).map_err(
     from_raw_error,
   )
+  call.awaiting = false
   ignore(call.done.finish(result))
   result
 }

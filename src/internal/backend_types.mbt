@@ -13,13 +13,27 @@
 // limitations under the License.
 
 ///|
-pub struct BackendError {
+pub(all) enum BackendErrorKind {
+  Status
+  Transport
+  Timeout
+  Cancelled
+  CodecEncode
+  CodecDecode
+  ChannelClosed
+  InvalidUsage
+  Internal
+  Unknown(String)
+} derive(Show, Eq, ToJson)
+
+///|
+pub(all) struct BackendError {
   code : Int
   message : String
   details : String?
   metadata_text : Array[(String, Array[String])]
   metadata_binary : Array[(String, Array[Bytes])]
-  kind : String
+  kind : BackendErrorKind
 } derive(Show, Eq, ToJson)
 
 ///|
@@ -57,13 +71,14 @@ pub(all) struct BackendCallOptions {
 } derive(Show, Eq, ToJson)
 
 ///|
-pub struct ChannelHandle {
+pub(all) struct ChannelHandle {
   priv inner : @impl.Channel
 }
 
 ///|
-pub struct UnaryHandle[Resp] {
+pub(all) struct UnaryHandle[Resp] {
   priv inner : @impl.UnaryCall
   priv done : FinishOnce[Result[Resp, BackendError]]
+  priv mut awaiting : Bool
   priv decode : (Bytes) -> Resp raise
 }

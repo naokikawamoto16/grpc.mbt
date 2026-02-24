@@ -54,7 +54,8 @@ pub fn[Resp] UnaryCall::is_done(self : UnaryCall[Resp]) -> Bool {
 
 ///|
 /// Wait for unary completion and return the final result.
-/// Repeated calls return the same cached result.
+/// Repeated sequential calls return the same cached result.
+/// Concurrent waits on the same `UnaryCall` are not supported.
 pub async fn[Resp] UnaryCall::wait(
   self : UnaryCall[Resp],
 ) -> Result[Resp, RpcError] {

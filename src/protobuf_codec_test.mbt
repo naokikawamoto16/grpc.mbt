@@ -82,6 +82,19 @@ async fn new_insecure_client_for_protobuf_codec_test() -> (
 }
 
 ///|
+async fn with_protobuf_codec_test_client(f : async (Client) -> Unit) -> Unit {
+  @async.with_task_group(root => {
+    let setup = new_insecure_client_for_protobuf_codec_test()
+    let client = setup.0
+    let channel = setup.1
+    let server = setup.2
+    defer root.spawn_bg(allow_failure=true, () => server.stop())
+    defer channel.close()
+    f(client)
+  })
+}
+
+///|
 test "encode_protobuf/decode_protobuf round trip" {
   let message = { text: "hello protobuf" }
   let encoded = encode_protobuf(message)
@@ -99,57 +112,42 @@ test "protobuf_codec round trip" {
 }
 
 ///|
-async test "protobuf_codec unary success with generated-like message traits" {
-  let setup = new_insecure_client_for_protobuf_codec_test()
-  let client = setup.0
-  let channel = setup.1
-  let server = setup.2
-  let codec : Codec[EchoProtoMessage, EchoProtoMessage] = protobuf_codec()
-  let descriptor = MethodDescriptor::new("test.EchoService", "Echo", codec).unwrap()
+async test "protobuf_codec unary success round trip over echo backend" {
+  with_protobuf_codec_test_client(client => {
+    let codec : Codec[EchoProtoMessage, EchoProtoMessage] = protobuf_codec()
+    let descriptor = MethodDescriptor::new("test.EchoService", "Echo", codec).unwrap()
 
-  let request = { text: "hello grpc" }
-  let response = client.unary(descriptor, request)
-  assert_eq(response, Ok(request))
-
-  channel.close()
-  server.stop()
+    let request = { text: "hello grpc" }
+    let response = client.unary(descriptor, request)
+    assert_eq(response, Ok(request))
+  })
 }
 
 ///|
 async test "protobuf_codec encode failure is normalized to CodecEncode" {
-  let setup = new_insecure_client_for_protobuf_codec_test()
-  let client = setup.0
-  let channel = setup.1
-  let server = setup.2
-  let codec : Codec[EncodeFailMessage, EchoProtoMessage] = protobuf_codec()
-  let descriptor = MethodDescriptor::new("test.EchoService", "Echo", codec).unwrap()
+  with_protobuf_codec_test_client(client => {
+    let codec : Codec[EncodeFailMessage, EchoProtoMessage] = protobuf_codec()
+    let descriptor = MethodDescriptor::new("test.EchoService", "Echo", codec).unwrap()
 
-  let request = EncodeFailMessage::{  }
-  let result = client.unary(descriptor, request)
-  match result {
-    Ok(_) => panic()
-    Err(err) => assert_eq(err.kind, CodecEncode)
-  }
-
-  channel.close()
-  server.stop()
+    let request = EncodeFailMessage::{  }
+    let result = client.unary(descriptor, request)
+    match result {
+      Ok(_) => panic()
+      Err(err) => assert_eq(err.kind, CodecEncode)
+    }
+  })
 }
 
 ///|
 async test "protobuf_codec decode failure is normalized to CodecDecode" {
-  let setup = new_insecure_client_for_protobuf_codec_test()
-  let client = setup.0
-  let channel = setup.1
-  let server = setup.2
-  let codec : Codec[EchoProtoMessage, DecodeFailMessage] = protobuf_codec()
-  let descriptor = MethodDescriptor::new("test.EchoService", "Echo", codec).unwrap()
+  with_protobuf_codec_test_client(client => {
+    let codec : Codec[EchoProtoMessage, DecodeFailMessage] = protobuf_codec()
+    let descriptor = MethodDescriptor::new("test.EchoService", "Echo", codec).unwrap()
 
-  let result = client.unary(descriptor, { text: "decode-fail" })
-  match result {
-    Ok(_) => panic()
-    Err(err) => assert_eq(err.kind, CodecDecode)
-  }
-
-  channel.close()
-  server.stop()
+    let result = client.unary(descriptor, { text: "decode-fail" })
+    match result {
+      Ok(_) => panic()
+      Err(err) => assert_eq(err.kind, CodecDecode)
+    }
+  })
 }

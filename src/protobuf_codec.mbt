@@ -24,9 +24,7 @@ pub fn[T : @protobuf.Write] encode_protobuf(value : T) -> Bytes raise {
 /// Decode protobuf bytes into a value using `moonbitlang/protobuf`.
 pub fn[T : Default + @protobuf.Read] decode_protobuf(bytes : Bytes) -> T raise {
   let reader = @protobuf.BytesReader::from_bytes(bytes)
-  let mut decoded = T::default()
-  decoded = @protobuf.Read::read(reader)
-  decoded
+  @protobuf.Read::read(reader)
 }
 
 ///|
@@ -39,11 +37,7 @@ pub fn[Req : @protobuf.Write, Resp : Default + @protobuf.Read] protobuf_codec() 
   Resp,
 ] {
   {
-    encode: value => {
-      let writer = @buffer.new()
-      @protobuf.Write::write(value, writer)
-      writer.to_bytes()
-    },
+    encode: value => encode_protobuf(value),
     decode: bytes => {
       let decoded : Resp = decode_protobuf(bytes)
       decoded

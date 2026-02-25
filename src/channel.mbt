@@ -26,7 +26,7 @@ pub fn Channel::new(
   target : String,
   options? : ChannelOptions = default_channel_options(),
 ) -> Result[Channel, RpcError] {
-  if target.length() == 0 {
+  if target.trim().length() == 0 {
     return Err(invalid_argument_error("target must not be empty"))
   }
   validate_channel_options(options).bind(_ => {

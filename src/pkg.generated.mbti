@@ -79,10 +79,11 @@ pub impl ToJson for MetadataValue
 pub(all) struct MethodDescriptor[Req, Resp] {
   service : String
   method_name : String
-  path : String
   codec : Codec[Req, Resp]
+  // private fields
 }
 pub fn[Req, Resp] MethodDescriptor::new(String, String, Codec[Req, Resp]) -> Result[Self[Req, Resp], RpcError]
+pub fn[Req, Resp] MethodDescriptor::path(Self[Req, Resp]) -> String
 
 pub(all) struct RpcError {
   code : StatusCode

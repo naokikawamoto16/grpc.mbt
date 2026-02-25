@@ -71,7 +71,7 @@ pub fn Metadata::add_binary(
         )
       }
       let values = self.entries_map.get_or_init(normalized_key, fn() { [] })
-      values.push(Binary(value))
+      values.push(Binary(clone_bytes(value)))
       Ok(())
     }
   }
@@ -83,7 +83,7 @@ pub fn Metadata::add_binary(
 pub fn Metadata::get(self : Metadata, key : String) -> Array[MetadataValue] {
   let normalized = normalize_metadata_key(key)
   match self.entries_map.get(normalized) {
-    Some(values) => values.copy()
+    Some(values) => clone_metadata_values(values)
     None => []
   }
 }
@@ -93,12 +93,32 @@ pub fn Metadata::get(self : Metadata, key : String) -> Array[MetadataValue] {
 pub fn Metadata::entries(
   self : Metadata,
 ) -> Array[(String, Array[MetadataValue])] {
-  self.entries_map.to_array().map(entry => (entry.0, entry.1.copy()))
+  self.entries_map
+  .to_array()
+  .map(entry => (entry.0, clone_metadata_values(entry.1)))
 }
 
 ///|
 fn normalize_metadata_key(key : String) -> String {
   key.to_lower()
+}
+
+///|
+fn clone_bytes(value : Bytes) -> Bytes {
+  Bytes::from_array(value.to_array())
+}
+
+///|
+fn clone_metadata_value(value : MetadataValue) -> MetadataValue {
+  match value {
+    Text(text) => Text(text)
+    Binary(bytes) => Binary(clone_bytes(bytes))
+  }
+}
+
+///|
+fn clone_metadata_values(values : Array[MetadataValue]) -> Array[MetadataValue] {
+  values.map(clone_metadata_value)
 }
 
 ///|
@@ -148,14 +168,12 @@ fn metadata_to_backend(
 ) -> (Array[(String, Array[String])], Array[(String, Array[Bytes])]) {
   let text_entries : Array[(String, Array[String])] = []
   let binary_entries : Array[(String, Array[Bytes])] = []
-  for _, entry in metadata.entries() {
-    let key = entry.0
-    let values = entry.1
+  for key, values in metadata.entries_map {
     if key.has_suffix("-bin") {
       let binaries : Array[Bytes] = []
       for value in values {
         guard value is Binary(bytes) else { continue }
-        binaries.push(bytes)
+        binaries.push(clone_bytes(bytes))
       }
       binary_entries.push((key, binaries))
     } else {
@@ -173,9 +191,10 @@ fn metadata_to_backend(
 ///|
 /// Reconstruct a `Metadata` from the raw arrays returned by the backend.
 ///
-/// NOTE: Validation errors from `add_text` / `add_binary` are intentionally
-/// ignored here because backend-supplied keys are assumed to be well-formed.
-/// If this assumption is violated, the offending entries are silently dropped.
+/// NOTE: This performs best-effort reconstruction. Backend-supplied metadata is
+/// expected to be well-formed, but invalid keys or `-bin` rule violations can
+/// still happen. Those offending entries are intentionally and silently dropped
+/// to preserve compatibility with backend error handling.
 /// Consider adding debug-level logging if this becomes a problem in practice.
 fn metadata_from_backend(
   text_entries : Array[(String, Array[String])],

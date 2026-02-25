@@ -17,7 +17,7 @@
 pub(all) struct MethodDescriptor[Req, Resp] {
   service : String
   method_name : String
-  path : String
+  priv path : String
   codec : Codec[Req, Resp]
 }
 
@@ -36,19 +36,71 @@ pub fn[Req, Resp] MethodDescriptor::new(
 }
 
 ///|
-/// Check whether every character in `value` is an ASCII visible character
-/// (code point 33–126, i.e. printable ASCII excluding space).
-///
-/// This is used to validate gRPC service and method names, which are less
-/// restrictive than metadata keys (`[0-9a-z_.-]`).
-fn is_ascii_visible_string(value : String) -> Bool {
+/// Return the canonical gRPC path `/{service}/{method}`.
+pub fn[Req, Resp] MethodDescriptor::path(
+  self : MethodDescriptor[Req, Resp],
+) -> String {
+  self.path
+}
+
+///|
+fn is_proto_ident_start(ch : Char) -> Bool {
+  let code = ch.to_int()
+  (code >= 0x41 && code <= 0x5A) || // A-Z
+  (code >= 0x61 && code <= 0x7A) || // a-z
+  code == 0x5F // _
+}
+
+///|
+fn is_proto_ident_continue(ch : Char) -> Bool {
+  let code = ch.to_int()
+  is_proto_ident_start(ch) || (code >= 0x30 && code <= 0x39) // 0-9
+}
+
+///|
+fn is_valid_proto_ident(value : String) -> Bool {
+  let mut is_first = true
   for ch in value.iter() {
-    let code = ch.to_int()
-    if code < 33 || code > 126 {
+    if is_first {
+      if not(is_proto_ident_start(ch)) {
+        return false
+      }
+      is_first = false
+      continue
+    }
+    if not(is_proto_ident_continue(ch)) {
       return false
     }
   }
-  true
+  not(is_first)
+}
+
+///|
+fn is_valid_service_name(service : String) -> Bool {
+  let mut segment_len = 0
+  for ch in service.iter() {
+    if ch.to_int() == 0x2E {
+      if segment_len == 0 {
+        return false
+      }
+      segment_len = 0
+      continue
+    }
+    if segment_len == 0 {
+      if not(is_proto_ident_start(ch)) {
+        return false
+      }
+    } else if not(is_proto_ident_continue(ch)) {
+      return false
+    }
+    segment_len += 1
+  }
+  segment_len > 0
+}
+
+///|
+fn is_valid_method_name_ident(method_name : String) -> Bool {
+  is_valid_proto_ident(method_name)
 }
 
 ///|
@@ -56,6 +108,7 @@ fn validate_method_name(
   service : String,
   method_name : String,
 ) -> Result[Unit, RpcError] {
+  // Keep these checks for more specific error messages than the generic proto validators.
   if service.length() == 0 {
     return Err(invalid_argument_error("service must not be empty"))
   }
@@ -68,15 +121,13 @@ fn validate_method_name(
   if method_name.contains("/") {
     return Err(invalid_argument_error("method must not contain '/'"))
   }
-  if !is_ascii_visible_string(service) {
+  if !is_valid_service_name(service) {
     return Err(
-      invalid_argument_error("service must use ASCII visible characters"),
+      invalid_argument_error("service must be a dot-separated proto identifier"),
     )
   }
-  if !is_ascii_visible_string(method_name) {
-    return Err(
-      invalid_argument_error("method must use ASCII visible characters"),
-    )
+  if !is_valid_method_name_ident(method_name) {
+    return Err(invalid_argument_error("method must be a proto identifier"))
   }
   Ok(())
 }

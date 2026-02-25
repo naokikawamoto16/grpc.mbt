@@ -15,7 +15,7 @@
 ///|
 /// Handle for a single unary RPC.
 pub struct UnaryCall[Resp] {
-  priv handle : @internal.UnaryHandle[Resp]?
+  priv mut handle : @internal.UnaryHandle[Resp]?
   priv mut cached : Result[Resp, RpcError]?
 }
 
@@ -29,6 +29,16 @@ fn[Resp] new_pending_unary_call(
   handle : @internal.UnaryHandle[Resp],
 ) -> UnaryCall[Resp] {
   { handle: Some(handle), cached: None }
+}
+
+///|
+fn[Resp] should_cache_unary_wait_result(
+  result : Result[Resp, RpcError],
+) -> Bool {
+  match result {
+    Err(error) => error.kind != InvalidArgument
+    Ok(_) => true
+  }
 }
 
 ///|
@@ -67,6 +77,9 @@ pub async fn[Resp] UnaryCall::wait(
   let result = @internal.await_unary(handle).map_err(error => {
     normalize_backend_error(error)
   })
-  self.cached = Some(result)
+  if should_cache_unary_wait_result(result) {
+    self.cached = Some(result)
+    self.handle = None
+  }
   result
 }

@@ -24,11 +24,6 @@ struct EchoProtoMessage {
 } derive(Eq, Show)
 
 ///|
-impl Default for EchoProtoMessage with default() -> EchoProtoMessage {
-  { text: "" }
-}
-
-///|
 pub impl @protobuf.Write for EchoProtoMessage with write(
   self : EchoProtoMessage,
   writer : &@protobuf.Writer,
@@ -56,11 +51,6 @@ pub impl @protobuf.Write for EncodeFailMessage with write(
 
 ///|
 struct DecodeFailMessage {}
-
-///|
-impl Default for DecodeFailMessage with default() -> DecodeFailMessage {
-  DecodeFailMessage::{  }
-}
 
 ///|
 pub impl @protobuf.Read for DecodeFailMessage with read_with_limit(
@@ -141,6 +131,7 @@ async test "protobuf_codec encode failure is normalized to CodecEncode" {
 ///|
 async test "protobuf_codec decode failure is normalized to CodecDecode" {
   with_protobuf_codec_test_client(client => {
+    let _ = DecodeFailMessage::{  }
     let codec : Codec[EchoProtoMessage, DecodeFailMessage] = protobuf_codec()
     let descriptor = MethodDescriptor::new("test.EchoService", "Echo", codec).unwrap()
 

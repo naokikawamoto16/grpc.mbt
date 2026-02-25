@@ -6,11 +6,11 @@ import {
 }
 
 // Values
-pub fn[T : Default + @protobuf.Read] decode_protobuf(Bytes) -> T raise
+pub fn[T : @protobuf.Read] decode_protobuf(Bytes) -> T raise
 
 pub fn[T : @protobuf.Write] encode_protobuf(T) -> Bytes raise
 
-pub fn[Req : @protobuf.Write, Resp : Default + @protobuf.Read] protobuf_codec() -> Codec[Req, Resp]
+pub fn[Req : @protobuf.Write, Resp : @protobuf.Read] protobuf_codec() -> Codec[Req, Resp]
 
 // Errors
 

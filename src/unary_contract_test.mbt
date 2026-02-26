@@ -39,12 +39,162 @@ fn default_call_options_for_test(timeout_ms : Int?) -> CallOptions {
 }
 
 ///|
+fn insecure_channel_options_for_test() -> ChannelOptions {
+  {
+    security: Insecure,
+    max_send_message_length: None,
+    max_receive_message_length: None,
+    keepalive_time_ms: None,
+    keepalive_timeout_ms: None,
+    default_authority: None,
+    user_agent: None,
+  }
+}
+
+///|
+fn tls_options_for_test() -> TlsOptions {
+  {
+    root_certs: None,
+    private_key: None,
+    cert_chain: None,
+    server_name_override: None,
+    reject_unauthorized: None,
+  }
+}
+
+///|
+fn assert_invalid_channel_options(options : ChannelOptions) -> Unit raise {
+  let result = Channel::new("127.0.0.1:50051", options~)
+  match result {
+    Ok(channel) => {
+      channel.close()
+      panic()
+    }
+    Err(err) => {
+      assert_eq(err.code, InvalidArgument)
+      assert_eq(err.kind, InvalidArgument)
+    }
+  }
+}
+
+///|
+test "Channel::new rejects empty and blank-only targets" {
+  let cases = ["", "   ", "\t\r\n"]
+
+  for target in cases {
+    let result = Channel::new(target)
+    match result {
+      Ok(channel) => {
+        channel.close()
+        panic()
+      }
+      Err(err) => {
+        assert_eq(err.code, InvalidArgument)
+        assert_eq(err.kind, InvalidArgument)
+      }
+    }
+  }
+}
+
+///|
+test "Channel::new rejects blank TLS server_name_override" {
+  let options : ChannelOptions = {
+    ..insecure_channel_options_for_test(),
+    security: Tls({
+      ..tls_options_for_test(),
+      server_name_override: Some("   "),
+    }),
+  }
+  assert_invalid_channel_options(options)
+}
+
+///|
+test "Channel::new rejects unpaired mTLS key and cert" {
+  let private_key_only : ChannelOptions = {
+    ..insecure_channel_options_for_test(),
+    security: Tls({ ..tls_options_for_test(), private_key: Some(b"key") }),
+  }
+  let cert_chain_only : ChannelOptions = {
+    ..insecure_channel_options_for_test(),
+    security: Tls({ ..tls_options_for_test(), cert_chain: Some(b"cert") }),
+  }
+
+  assert_invalid_channel_options(private_key_only)
+  assert_invalid_channel_options(cert_chain_only)
+}
+
+///|
+test "Channel::new rejects invalid message length options" {
+  let cases = [
+    { ..insecure_channel_options_for_test(), max_send_message_length: Some(-2) },
+    {
+      ..insecure_channel_options_for_test(),
+      max_receive_message_length: Some(-2),
+    },
+  ]
+
+  for options in cases {
+    assert_invalid_channel_options(options)
+  }
+}
+
+///|
+test "Channel::new accepts message length sentinel and zero" {
+  let cases = [
+    { ..insecure_channel_options_for_test(), max_send_message_length: Some(-1) },
+    { ..insecure_channel_options_for_test(), max_send_message_length: Some(0) },
+    {
+      ..insecure_channel_options_for_test(),
+      max_receive_message_length: Some(-1),
+    },
+    {
+      ..insecure_channel_options_for_test(),
+      max_receive_message_length: Some(0),
+    },
+  ]
+
+  for options in cases {
+    let result = Channel::new("127.0.0.1:50051", options~)
+    match result {
+      Ok(channel) => channel.close()
+      Err(_) => panic()
+    }
+  }
+}
+
+///|
+test "Channel::new rejects non-positive keepalive values" {
+  let cases = [
+    { ..insecure_channel_options_for_test(), keepalive_time_ms: Some(0) },
+    { ..insecure_channel_options_for_test(), keepalive_time_ms: Some(-1) },
+    { ..insecure_channel_options_for_test(), keepalive_timeout_ms: Some(0) },
+    { ..insecure_channel_options_for_test(), keepalive_timeout_ms: Some(-1) },
+  ]
+
+  for options in cases {
+    assert_invalid_channel_options(options)
+  }
+}
+
+///|
+test "Channel::new rejects blank authority and user agent" {
+  let cases = [
+    { ..insecure_channel_options_for_test(), default_authority: Some("   ") },
+    { ..insecure_channel_options_for_test(), user_agent: Some("\t") },
+  ]
+
+  for options in cases {
+    assert_invalid_channel_options(options)
+  }
+}
+
+///|
 async fn new_insecure_client() -> (
   Client,
   Channel,
   @backend_test_util.TestServer,
 ) {
-  let server = @backend_test_util.start_test_server_insecure()
+  let server = @backend_test_util.BackendTest::start_test_server_insecure()
   let target = "127.0.0.1:\{server.port()}"
   let channel = Channel::new(target).unwrap()
   (Client::new(channel), channel, server)
@@ -116,6 +266,36 @@ async test "Unary timeout and timeout argument validation" {
     }
   }
   channel.close()
+  server.stop()
+}
+
+///|
+async test "Client::start_unary validates timeout before closed-channel gate" {
+  let setup = new_insecure_client()
+  let client = setup.0
+  let channel = setup.1
+  let server = setup.2
+  let descriptor = MethodDescriptor::new(
+    "test.EchoService",
+    "Echo",
+    utf8_codec(),
+  ).unwrap()
+  channel.close()
+
+  let result = client.unary(
+    descriptor,
+    "hello",
+    options=default_call_options_for_test(Some(0)),
+  )
+  match result {
+    Ok(_) => panic()
+    Err(err) => {
+      assert_eq(err.code, InvalidArgument)
+      assert_eq(err.kind, InvalidArgument)
+      assert_true(err.kind != ChannelClosed)
+    }
+  }
+
   server.stop()
 }
 
@@ -218,18 +398,81 @@ async test "Task cancellation normalizes to cancelled result" {
 }
 
 ///|
+async test "Retry wait immediately after timeout does not return internal error" {
+  let setup = new_insecure_client()
+  let client = setup.0
+  let channel = setup.1
+  let server = setup.2
+  let descriptor = MethodDescriptor::new(
+    "test.EchoService",
+    "Echo",
+    utf8_codec(),
+  ).unwrap()
+  let call = client.start_unary(descriptor, "sleep:200:done")
+
+  let timed = @async.with_timeout_opt(10, () => call.wait())
+  assert_eq(timed, None)
+
+  let retried = call.wait()
+  match retried {
+    Ok(_) => panic()
+    Err(err) => {
+      assert_true(err.kind != Internal)
+      assert_eq(err.code, Cancelled)
+      assert_eq(err.kind, Cancelled)
+    }
+  }
+
+  channel.close()
+  server.stop()
+}
+
+///|
+async test "Sequential unary waits cache terminal success result" {
+  let setup = new_insecure_client()
+  let client = setup.0
+  let channel = setup.1
+  let server = setup.2
+  let descriptor = MethodDescriptor::new(
+    "test.EchoService",
+    "Echo",
+    utf8_codec(),
+  ).unwrap()
+  let call = client.start_unary(descriptor, "sleep:50:done")
+  let first = call.wait()
+  assert_eq(first, Ok("done"))
+  let second = call.wait()
+  assert_eq(second, Ok("done"))
+
+  channel.close()
+  server.stop()
+}
+
+///|
 async test "Unknown JS exception is normalized to RpcError" {
   let setup = new_insecure_client()
   let client = setup.0
   let channel = setup.1
   let server = setup.2
-  let descriptor : MethodDescriptor[String, String] = {
-    service: "test.EchoService",
-    method_name: "Echo",
-    path: "/__internal__/throw_js_exception",
-    codec: utf8_codec(),
+  let marker_key = @backend_test_util.BackendTest::client_start_unary_exception_marker_key()
+  let marker_value = "normalize-error-test"
+  @backend_test_util.BackendTest::inject_next_client_start_unary_exception(
+    marker_value,
+  )
+  defer @backend_test_util.BackendTest::restore_client_start_unary_exception_injection()
+  let descriptor = MethodDescriptor::new(
+    "test.EchoService",
+    "Echo",
+    utf8_codec(),
+  ).unwrap()
+  let metadata = Metadata::new()
+  ignore(metadata.add_text(marker_key, marker_value).unwrap())
+  let options : CallOptions = {
+    metadata,
+    timeout_ms: None,
+    wait_for_ready: false,
   }
-  let result = client.unary(descriptor, "hello")
+  let result = client.unary(descriptor, "hello", options~)
   match result {
     Ok(_) => panic()
     Err(err) => {

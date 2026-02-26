@@ -15,7 +15,7 @@
 ///|
 fn error_from_exception(err : Error) -> RawError {
   let text = err.to_string()
-  let cancelled = text.contains("Cancelled")
+  let cancelled = @async.is_cancellation_error(err)
   raw_error(
     if cancelled {
       grpc_cancelled
@@ -56,10 +56,29 @@ pub fn is_unary_done(call : UnaryCall) -> Bool {
 }
 
 ///|
+async fn await_cached_result_while_in_progress(
+  call : UnaryCall,
+) -> RawUnaryOutcome {
+  if call.cached is Some(result) {
+    return result
+  }
+  let yielded : Result[Unit, Error] = try? @async.sleep(1)
+  match yielded {
+    Ok(_) => await_cached_result_while_in_progress(call)
+    Err(err) => Failure(error_from_exception(err))
+  }
+}
+
+///|
 pub async fn await_unary(call : UnaryCall) -> RawUnaryOutcome {
   if call.cached is Some(result) {
     return result
   }
+  if call.awaiting {
+    return await_cached_result_while_in_progress(call)
+  }
+
+  call.awaiting = true
 
   let waited : Result[JsUnaryOutcome, Error] = try? @js_async.run_promise(signal => {
     ffi_unary_wait(call.inner, signal)
@@ -69,6 +88,7 @@ pub async fn await_unary(call : UnaryCall) -> RawUnaryOutcome {
     Err(err) => Failure(error_from_exception(err))
   }
   call.cached = Some(normalized)
+  call.awaiting = false
   normalized
 }
 

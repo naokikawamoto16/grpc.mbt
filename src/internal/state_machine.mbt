@@ -14,7 +14,7 @@
 
 ///|
 pub struct FinishOnce[T] {
-  mut value : T?
+  priv mut value : T?
 }
 
 ///|

@@ -26,7 +26,7 @@ pub fn Channel::new(
   target : String,
   options? : ChannelOptions = default_channel_options(),
 ) -> Result[Channel, RpcError] {
-  if target.length() == 0 {
+  if target.trim().length() == 0 {
     return Err(invalid_argument_error("target must not be empty"))
   }
   validate_channel_options(options).bind(_ => {
@@ -54,16 +54,14 @@ pub fn Channel::is_closed(self : Channel) -> Bool {
 fn to_backend_security(security : Security) -> @internal.BackendSecurity {
   match security {
     Insecure => @internal.Insecure
-    Tls(options) => {
-      let raw_tls : @internal.BackendTlsOptions = {
+    Tls(options) =>
+      @internal.Tls({
         root_certs: options.root_certs,
         private_key: options.private_key,
         cert_chain: options.cert_chain,
         server_name_override: options.server_name_override,
         reject_unauthorized: options.reject_unauthorized,
-      }
-      @internal.Tls(raw_tls)
-    }
+      })
   }
 }
 

@@ -70,7 +70,7 @@ pub fn new_channel(
     Err(message) => Err(message)
     Ok(_) => {
       let args = security_to_args(options.security)
-      let channel = ffi_new_channel(
+      let result = ffi_new_channel(
         target,
         args.0,
         args.1,
@@ -85,7 +85,15 @@ pub fn new_channel(
         options.default_authority,
         options.user_agent,
       )
-      Ok({ inner: channel })
+      if ffi_new_channel_result_is_ok(result) {
+        Ok({ inner: ffi_new_channel_result_channel(result) })
+      } else {
+        Err(
+          ffi_new_channel_result_error(result).unwrap_or(
+            "failed to create grpc-js channel",
+          ),
+        )
+      }
     }
   }
 }

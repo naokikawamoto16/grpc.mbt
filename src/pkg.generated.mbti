@@ -6,11 +6,11 @@ import {
 }
 
 // Values
-pub fn[T : Default + @protobuf.Read] decode_protobuf(Bytes) -> T raise
+pub fn[T : @protobuf.Read] decode_protobuf(Bytes) -> T raise
 
 pub fn[T : @protobuf.Write] encode_protobuf(T) -> Bytes raise
 
-pub fn[Req : @protobuf.Write, Resp : Default + @protobuf.Read] protobuf_codec() -> Codec[Req, Resp]
+pub fn[Req : @protobuf.Write, Resp : @protobuf.Read] protobuf_codec() -> Codec[Req, Resp]
 
 // Errors
 
@@ -79,10 +79,11 @@ pub impl ToJson for MetadataValue
 pub(all) struct MethodDescriptor[Req, Resp] {
   service : String
   method_name : String
-  path : String
   codec : Codec[Req, Resp]
+  // private fields
 }
 pub fn[Req, Resp] MethodDescriptor::new(String, String, Codec[Req, Resp]) -> Result[Self[Req, Resp], RpcError]
+pub fn[Req, Resp] MethodDescriptor::path(Self[Req, Resp]) -> String
 
 pub(all) struct RpcError {
   code : StatusCode

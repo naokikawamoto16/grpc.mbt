@@ -26,72 +26,11 @@ pub type JsUnaryOutcome
 
 ///|
 #external
-pub type JsTestServer
+pub type JsNewChannelResult
 
 ///|
-extern "js" fn ffi_reset_conversion_counters() =
-  #| () => {
-  #|   globalThis.__grpcConversionCounters = {
-  #|     bytesToBuffer: 0,
-  #|     bufferToBytes: 0,
-  #|   };
-  #| }
-
-///|
-extern "js" fn ffi_get_conversion_counters() -> Array[Int] =
-  #| () => {
-  #|   const counters = globalThis.__grpcConversionCounters || {
-  #|     bytesToBuffer: 0,
-  #|     bufferToBytes: 0,
-  #|   };
-  #|   return [counters.bytesToBuffer | 0, counters.bufferToBytes | 0];
-  #| }
-
-///|
-extern "js" fn ffi_read_text_file(path : String) -> @js_async.Promise[String] =
-  #| async (path) => {
-  #|   const content = await require("node:fs/promises").readFile(path, "utf8");
-  #|   return String(content);
-  #| }
-
-///|
-extern "js" fn ffi_generate_test_tls_material() -> @js_async.Promise[
-  Array[Bytes],
-] =
-  #| async () => {
-  #|   const fs = require("node:fs/promises");
-  #|   const os = require("node:os");
-  #|   const path = require("node:path");
-  #|   const childProcess = require("node:child_process");
-  #|   const util = require("node:util");
-  #|   const execFile = util.promisify(childProcess.execFile);
-  #|   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "grpc-tls-"));
-  #|   const certPath = path.join(tempDir, "server.crt");
-  #|   const keyPath = path.join(tempDir, "server.key");
-  #|   try {
-  #|     await execFile("openssl", [
-  #|       "req",
-  #|       "-x509",
-  #|       "-newkey",
-  #|       "rsa:2048",
-  #|       "-keyout",
-  #|       keyPath,
-  #|       "-out",
-  #|       certPath,
-  #|       "-sha256",
-  #|       "-days",
-  #|       "1",
-  #|       "-nodes",
-  #|       "-subj",
-  #|       "/CN=localhost",
-  #|     ]);
-  #|     const cert = await fs.readFile(certPath);
-  #|     const key = await fs.readFile(keyPath);
-  #|     return [cert, key];
-  #|   } finally {
-  #|     await fs.rm(tempDir, { recursive: true, force: true });
-  #|   }
-  #| }
+#external
+pub type JsStartUnaryResult
 
 ///|
 extern "js" fn ffi_require_grpc_js() -> Bool =
@@ -119,7 +58,7 @@ extern "js" fn ffi_new_channel(
   keepalive_timeout_ms : Int?,
   default_authority : String?,
   user_agent : String?,
-) -> JsChannel =
+) -> JsNewChannelResult =
   #| (
   #|   target,
   #|   insecure,
@@ -135,60 +74,104 @@ extern "js" fn ffi_new_channel(
   #|   default_authority,
   #|   user_agent,
   #| ) => {
-  #|   const grpc = require("@grpc/grpc-js");
-  #|   const options = {};
-  #|   if (max_send_message_length !== undefined && max_send_message_length !== null) {
-  #|     options["grpc.max_send_message_length"] = max_send_message_length;
-  #|   }
-  #|   if (max_receive_message_length !== undefined && max_receive_message_length !== null) {
-  #|     options["grpc.max_receive_message_length"] = max_receive_message_length;
-  #|   }
-  #|   if (keepalive_time_ms !== undefined && keepalive_time_ms !== null) {
-  #|     options["grpc.keepalive_time_ms"] = keepalive_time_ms;
-  #|   }
-  #|   if (keepalive_timeout_ms !== undefined && keepalive_timeout_ms !== null) {
-  #|     options["grpc.keepalive_timeout_ms"] = keepalive_timeout_ms;
-  #|   }
-  #|   if (default_authority !== undefined && default_authority !== null) {
-  #|     options["grpc.default_authority"] = default_authority;
-  #|   }
-  #|   if (user_agent !== undefined && user_agent !== null) {
-  #|     options["grpc.primary_user_agent"] = user_agent;
-  #|   }
-  #|   if (server_name_override !== undefined && server_name_override !== null) {
-  #|     options["grpc.ssl_target_name_override"] = server_name_override;
-  #|   }
-  #|   const counters = globalThis.__grpcConversionCounters || (globalThis.__grpcConversionCounters = {
-  #|     bytesToBuffer: 0,
-  #|     bufferToBytes: 0,
-  #|   });
-  #|   const fromBytes = (bytes) => {
-  #|     if (bytes == null) {
-  #|       return null;
+  #|   const safeErrorString = (value, fallback) => {
+  #|     try {
+  #|       if (value == null) {
+  #|         return fallback;
+  #|       }
+  #|       if (typeof value === "string") {
+  #|         return value;
+  #|       }
+  #|       if (typeof value.message === "string" && value.message.length > 0) {
+  #|         return value.message;
+  #|       }
+  #|       return String(value);
+  #|     } catch (_) {
+  #|       return fallback;
   #|     }
-  #|     counters.bytesToBuffer += 1;
-  #|     return Buffer.from(bytes);
   #|   };
-  #|   const verifyOptions =
-  #|     reject_unauthorized !== undefined && reject_unauthorized !== null
-  #|       ? { rejectUnauthorized: Boolean(reject_unauthorized) }
-  #|       : undefined;
-  #|   const credentials = insecure
-  #|     ? grpc.credentials.createInsecure()
-  #|     : grpc.credentials.createSsl(
-  #|         fromBytes(root_certs),
-  #|         fromBytes(private_key),
-  #|         fromBytes(cert_chain),
-  #|         verifyOptions,
-  #|       );
-  #|   const client = new grpc.Client(target, credentials, options);
-  #|   return {
-  #|     grpc,
-  #|     client,
-  #|     closed: false,
-  #|     active: new Set(),
-  #|   };
+  #|   try {
+  #|     const grpc = require("@grpc/grpc-js");
+  #|     const options = {};
+  #|     if (max_send_message_length !== undefined && max_send_message_length !== null) {
+  #|       options["grpc.max_send_message_length"] = max_send_message_length;
+  #|     }
+  #|     if (max_receive_message_length !== undefined && max_receive_message_length !== null) {
+  #|       options["grpc.max_receive_message_length"] = max_receive_message_length;
+  #|     }
+  #|     if (keepalive_time_ms !== undefined && keepalive_time_ms !== null) {
+  #|       options["grpc.keepalive_time_ms"] = keepalive_time_ms;
+  #|     }
+  #|     if (keepalive_timeout_ms !== undefined && keepalive_timeout_ms !== null) {
+  #|       options["grpc.keepalive_timeout_ms"] = keepalive_timeout_ms;
+  #|     }
+  #|     if (default_authority !== undefined && default_authority !== null) {
+  #|       options["grpc.default_authority"] = default_authority;
+  #|     }
+  #|     if (user_agent !== undefined && user_agent !== null) {
+  #|       options["grpc.primary_user_agent"] = user_agent;
+  #|     }
+  #|     if (server_name_override !== undefined && server_name_override !== null) {
+  #|       options["grpc.ssl_target_name_override"] = server_name_override;
+  #|     }
+  #|     const counters = globalThis.__grpcConversionCounters || (globalThis.__grpcConversionCounters = {
+  #|       bytesToBuffer: 0,
+  #|       bufferToBytes: 0,
+  #|     });
+  #|     const fromBytes = (bytes) => {
+  #|       if (bytes == null) {
+  #|         return null;
+  #|       }
+  #|       counters.bytesToBuffer += 1;
+  #|       return Buffer.from(bytes);
+  #|     };
+  #|     const verifyOptions =
+  #|       reject_unauthorized !== undefined && reject_unauthorized !== null
+  #|         ? { rejectUnauthorized: Boolean(reject_unauthorized) }
+  #|         : undefined;
+  #|     const credentials = insecure
+  #|       ? grpc.credentials.createInsecure()
+  #|       : grpc.credentials.createSsl(
+  #|           fromBytes(root_certs),
+  #|           fromBytes(private_key),
+  #|           fromBytes(cert_chain),
+  #|           verifyOptions,
+  #|         );
+  #|     const client = new grpc.Client(target, credentials, options);
+  #|     return {
+  #|       ok: true,
+  #|       channel: {
+  #|         grpc,
+  #|         client,
+  #|         closed: false,
+  #|         active: new Set(),
+  #|       },
+  #|     };
+  #|   } catch (err) {
+  #|     return {
+  #|       ok: false,
+  #|       error: safeErrorString(err, "failed to create grpc-js channel"),
+  #|     };
+  #|   }
   #| }
+
+///|
+extern "js" fn ffi_new_channel_result_is_ok(
+  result : JsNewChannelResult,
+) -> Bool =
+  #| (result) => Boolean(result && result.ok)
+
+///|
+extern "js" fn ffi_new_channel_result_channel(
+  result : JsNewChannelResult,
+) -> JsChannel =
+  #| (result) => result.channel
+
+///|
+extern "js" fn ffi_new_channel_result_error(
+  result : JsNewChannelResult,
+) -> String? =
+  #| (result) => (result && result.ok ? null : (result?.error == null ? "failed to create grpc-js channel" : String(result.error)))
 
 ///|
 extern "js" fn ffi_channel_close(channel : JsChannel) =
@@ -223,7 +206,7 @@ extern "js" fn ffi_start_unary(
   binary_values : Array[Bytes],
   timeout_ms : Int?,
   wait_for_ready : Bool,
-) -> JsUnaryCall =
+) -> JsStartUnaryResult =
   #| (
   #|   channel,
   #|   path,
@@ -235,6 +218,23 @@ extern "js" fn ffi_start_unary(
   #|   timeout_ms,
   #|   wait_for_ready,
   #| ) => {
+  #|   const safeErrorString = (value, fallback) => {
+  #|     try {
+  #|       if (value == null) {
+  #|         return fallback;
+  #|       }
+  #|       if (typeof value === "string") {
+  #|         return value;
+  #|       }
+  #|       if (typeof value.message === "string" && value.message.length > 0) {
+  #|         return value.message;
+  #|       }
+  #|       return String(value);
+  #|     } catch (_) {
+  #|       return fallback;
+  #|     }
+  #|   };
+  #|   try {
   #|   const grpc = channel.grpc || require("@grpc/grpc-js");
   #|   const counters = globalThis.__grpcConversionCounters || (globalThis.__grpcConversionCounters = {
   #|     bytesToBuffer: 0,
@@ -280,16 +280,13 @@ extern "js" fn ffi_start_unary(
   #|   };
   #|   const normalizeError = (status, kindHint) => {
   #|     const code = Number.isInteger(status?.code) ? status.code : grpc.status.UNKNOWN;
-  #|     const message = status?.details || status?.message || String(status);
+  #|     const message =
+  #|       status?.details ||
+  #|       status?.message ||
+  #|       safeErrorString(status, "unknown grpc-js error");
   #|     const details = status?.details == null ? null : String(status.details);
   #|     const metadata = toMetadataArrays(status?.metadata);
   #|     let kind = kindHint || "status";
-  #|     if (code === grpc.status.CANCELLED) {
-  #|       kind = "cancelled";
-  #|     }
-  #|     if (code === grpc.status.DEADLINE_EXCEEDED) {
-  #|       kind = "timeout";
-  #|     }
   #|     return {
   #|       ok: false,
   #|       code,
@@ -321,15 +318,23 @@ extern "js" fn ffi_start_unary(
   #|     },
   #|     waitWithSignal: (signal) =>
   #|       new Promise((resolve) => {
-  #|         if (signal && typeof signal.addEventListener === "function") {
+  #|         const onAbort = () => {
+  #|           handle.cancel();
+  #|         };
+  #|         if (signal && signal.aborted) {
+  #|           onAbort();
+  #|         } else if (signal && typeof signal.addEventListener === "function") {
   #|           signal.addEventListener(
   #|             "abort",
-  #|             () => {
-  #|               handle.cancel();
-  #|             },
+  #|             onAbort,
   #|             { once: true },
   #|           );
   #|         }
+  #|         handle.promise.finally(() => {
+  #|           if (signal && typeof signal.removeEventListener === "function") {
+  #|             signal.removeEventListener("abort", onAbort);
+  #|           }
+  #|         });
   #|         handle.promise.then((outcome) => resolve(outcome));
   #|       }),
   #|   };
@@ -355,13 +360,10 @@ extern "js" fn ffi_start_unary(
   #|       metadataText: [],
   #|       metadataBinary: [],
   #|     });
-  #|     return handle;
+  #|     return { ok: true, call: handle };
   #|   }
   #|
   #|   try {
-  #|     if (path === "/__internal__/throw_js_exception") {
-  #|       throw new Error("forced js exception");
-  #|     }
   #|     const metadata = new grpc.Metadata();
   #|     for (let i = 0; i < text_keys.length; i += 1) {
   #|       metadata.add(text_keys[i], text_values[i]);
@@ -413,15 +415,39 @@ extern "js" fn ffi_start_unary(
   #|     settle({
   #|       ok: false,
   #|       code: grpc.status.INTERNAL,
-  #|       message: String(error),
+  #|       message: safeErrorString(error, "failed to start unary call"),
   #|       details: null,
   #|       kind: "internal",
   #|       metadataText: [],
   #|       metadataBinary: [],
   #|     });
   #|   }
-  #|   return handle;
+  #|   return { ok: true, call: handle };
+  #|   } catch (error) {
+  #|     return {
+  #|       ok: false,
+  #|       error: safeErrorString(error, "failed to start unary call"),
+  #|     };
+  #|   }
   #| }
+
+///|
+extern "js" fn ffi_start_unary_result_is_ok(
+  result : JsStartUnaryResult,
+) -> Bool =
+  #| (result) => Boolean(result && result.ok)
+
+///|
+extern "js" fn ffi_start_unary_result_call(
+  result : JsStartUnaryResult,
+) -> JsUnaryCall =
+  #| (result) => result.call
+
+///|
+extern "js" fn ffi_start_unary_result_error(
+  result : JsStartUnaryResult,
+) -> String? =
+  #| (result) => (result && result.ok ? null : (result?.error == null ? "failed to start unary call" : String(result.error)))
 
 ///|
 extern "js" fn ffi_unary_cancel(call : JsUnaryCall) =
@@ -482,99 +508,3 @@ extern "js" fn ffi_outcome_error_binary_entries(
   outcome : JsUnaryOutcome,
 ) -> Array[(String, Array[Bytes])] =
   #| (outcome) => outcome.metadataBinary || []
-
-///|
-extern "js" fn ffi_test_server_start(
-  insecure : Bool,
-  cert_chain : Bytes?,
-  private_key : Bytes?,
-) -> @js_async.Promise[JsTestServer] =
-  #| (insecure, cert_chain, private_key) => {
-  #|   const grpc = require("@grpc/grpc-js");
-  #|   const service = {
-  #|     Echo: {
-  #|       path: "/test.EchoService/Echo",
-  #|       requestStream: false,
-  #|       responseStream: false,
-  #|       requestSerialize: (value) => Buffer.from(value),
-  #|       requestDeserialize: (value) => Buffer.from(value),
-  #|       responseSerialize: (value) => Buffer.from(value),
-  #|       responseDeserialize: (value) => Buffer.from(value),
-  #|     },
-  #|   };
-  #|   const implementation = {
-  #|     Echo(call, callback) {
-  #|       const request = Buffer.from(call.request);
-  #|       const text = request.toString("utf8");
-  #|       if (text.startsWith("error:")) {
-  #|         const first = text.indexOf(":");
-  #|         const second = text.indexOf(":", first + 1);
-  #|         const codeText = second < 0 ? text.slice(first + 1) : text.slice(first + 1, second);
-  #|         const message = second < 0 ? "forced error" : text.slice(second + 1);
-  #|         const code = Number.parseInt(codeText, 10);
-  #|         const metadata = new grpc.Metadata();
-  #|         metadata.add("x-error-source", "test-server");
-  #|         metadata.add("trace-bin", Buffer.from([1, 2, 3, 4]));
-  #|         callback({
-  #|           code: Number.isInteger(code) ? code : grpc.status.UNKNOWN,
-  #|           message,
-  #|           details: message,
-  #|           metadata,
-  #|         });
-  #|         return;
-  #|       }
-  #|       if (text.startsWith("sleep:")) {
-  #|         const first = text.indexOf(":");
-  #|         const second = text.indexOf(":", first + 1);
-  #|         const sleepMs = Number.parseInt(text.slice(first + 1, second), 10);
-  #|         const payload = text.slice(second + 1);
-  #|         setTimeout(() => callback(null, Buffer.from(payload, "utf8")), Number.isInteger(sleepMs) ? sleepMs : 0);
-  #|         return;
-  #|       }
-  #|       callback(null, request);
-  #|     },
-  #|   };
-  #|   const server = new grpc.Server();
-  #|   server.addService(service, implementation);
-  #|   const credentials = insecure
-  #|     ? grpc.ServerCredentials.createInsecure()
-  #|     : (() => {
-  #|         const counters = globalThis.__grpcConversionCounters || (globalThis.__grpcConversionCounters = {
-  #|           bytesToBuffer: 0,
-  #|           bufferToBytes: 0,
-  #|         });
-  #|         counters.bytesToBuffer += 2;
-  #|         return grpc.ServerCredentials.createSsl(
-  #|           null,
-  #|           [{
-  #|             cert_chain: Buffer.from(cert_chain),
-  #|             private_key: Buffer.from(private_key),
-  #|           }],
-  #|           false,
-  #|         );
-  #|       })();
-  #|   return new Promise((resolve, reject) => {
-  #|     server.bindAsync("127.0.0.1:0", credentials, (error, port) => {
-  #|       if (error) {
-  #|         reject(error);
-  #|         return;
-  #|       }
-  #|       resolve({ server, port });
-  #|     });
-  #|   });
-  #| }
-
-///|
-extern "js" fn ffi_test_server_port(server : JsTestServer) -> Int =
-  #| (server) => server.port | 0
-
-///|
-extern "js" fn ffi_test_server_stop(
-  server : JsTestServer,
-) -> @js_async.Promise[Unit] =
-  #| (server) =>
-  #|   new Promise((resolve) => {
-  #|     server.server.tryShutdown(() => {
-  #|       resolve();
-  #|     });
-  #|   })

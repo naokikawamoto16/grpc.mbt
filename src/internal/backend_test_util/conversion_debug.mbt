@@ -19,15 +19,15 @@ pub(all) struct ConversionCounters {
 } derive(Show, Eq, ToJson)
 
 ///|
-pub fn reset_conversion_counters() -> Unit {
-  @impl.reset_conversion_counters()
+pub fn BackendTest::reset_conversion_counters() -> Unit {
+  ffi_reset_conversion_counters()
 }
 
 ///|
-pub fn conversion_counters() -> ConversionCounters {
-  let counters = @impl.conversion_counters()
-  {
-    bytes_to_buffer: counters.bytes_to_buffer,
-    buffer_to_bytes: counters.buffer_to_bytes,
+pub fn BackendTest::conversion_counters() -> ConversionCounters {
+  let values = ffi_get_conversion_counters()
+  if values.length() != 2 {
+    abort("ffi_get_conversion_counters must return exactly 2 items")
   }
+  { bytes_to_buffer: values[0], buffer_to_bytes: values[1] }
 }

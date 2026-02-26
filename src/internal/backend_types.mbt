@@ -13,7 +13,7 @@
 // limitations under the License.
 
 ///|
-pub enum BackendErrorKind {
+pub(all) enum BackendErrorKind {
   Status
   Transport
   Timeout
@@ -21,11 +21,13 @@ pub enum BackendErrorKind {
   CodecEncode
   CodecDecode
   ChannelClosed
+  InvalidUsage
   Internal
+  Unknown(String)
 } derive(Show, Eq, ToJson)
 
 ///|
-pub struct BackendError {
+pub(all) struct BackendError {
   code : Int
   message : String
   details : String?
@@ -69,21 +71,14 @@ pub(all) struct BackendCallOptions {
 } derive(Show, Eq, ToJson)
 
 ///|
-pub(all) struct BackendCapabilities {
-  unary : Bool
-  server_streaming : Bool
-  client_streaming : Bool
-  bidi_streaming : Bool
-} derive(Show, Eq, ToJson)
-
-///|
-pub struct ChannelHandle {
-  priv inner : @backend.Channel
+pub(all) struct ChannelHandle {
+  priv inner : @impl.Channel
 }
 
 ///|
-pub struct UnaryHandle[Resp] {
-  priv inner : @backend.UnaryCall
+pub(all) struct UnaryHandle[Resp] {
+  priv inner : @impl.UnaryCall
   priv done : FinishOnce[Result[Resp, BackendError]]
+  priv mut awaiting : Bool
   priv decode : (Bytes) -> Resp raise
 }

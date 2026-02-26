@@ -1,7 +1,9 @@
 import {
+  "moonbitlang/async" @async,
   "moonbitlang/async/js_async" @js_async,
 }
 
 import {
-  "moonbitlang/async" @async,
+  "naokikawamoto16/grpc/internal/backend_test_util" @test_util,
+  "moonbitlang/async",
 } for "test"

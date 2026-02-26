@@ -26,25 +26,26 @@ pub fn Client::new(channel : Channel) -> Client {
 
 ///|
 /// Start a unary RPC and return an awaitable call handle.
-/// The returned handle may already be failed when validation fails.
+/// The returned handle may already be failed when preflight checks fail
+/// (for example, invalid options or a closed channel).
 pub fn[Req, Resp] Client::start_unary(
   self : Client,
   desc : MethodDescriptor[Req, Resp],
   request : Req,
   options? : CallOptions = default_call_options(),
 ) -> UnaryCall[Resp] {
-  if self.channel.is_closed() {
-    return new_failed_unary_call(channel_closed_error(None))
-  }
   match validate_timeout(options) {
     Err(error) => return new_failed_unary_call(error)
     Ok(_) => ()
+  }
+  if self.channel.is_closed() {
+    return new_failed_unary_call(channel_closed_error(None))
   }
 
   match
     @internal.start_unary(
       self.channel.handle,
-      desc.path,
+      desc.path(),
       request,
       desc.codec.encode,
       desc.codec.decode,

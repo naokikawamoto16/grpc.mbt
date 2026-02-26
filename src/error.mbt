@@ -90,13 +90,29 @@ fn channel_closed_error(message : String?) -> RpcError {
 }
 
 ///|
+fn merge_unknown_backend_kind_detail(
+  details : String?,
+  unknown_kind : String,
+) -> String? {
+  let suffix = "backend returned unknown error kind: \{unknown_kind}"
+  match details {
+    Some(existing) => Some("\{existing}; \{suffix}")
+    None => Some(suffix)
+  }
+}
+
+///|
 /// Convert a backend-layer `BackendError` into a public `RpcError`.
 ///
-/// The status code is decoded from the integer representation, the error kind
-/// is mapped from `BackendErrorKind` to `RpcErrorKind`, and raw metadata
+/// The status code is decoded from the integer representation, the backend error
+/// kind is mapped to `RpcErrorKind`, and raw metadata
 /// arrays are reassembled into a `Metadata` value.
 fn normalize_backend_error(error : @internal.BackendError) -> RpcError {
-  let code = status_code_from_int(error.code)
+  let raw_code = status_code_from_int(error.code)
+  let code = match error.kind {
+    @internal.ChannelClosed => StatusCode::Cancelled
+    _ => raw_code
+  }
   let kind = match error.kind {
     @internal.Status => Status
     @internal.Transport => Transport
@@ -105,12 +121,19 @@ fn normalize_backend_error(error : @internal.BackendError) -> RpcError {
     @internal.CodecEncode => CodecEncode
     @internal.CodecDecode => CodecDecode
     @internal.ChannelClosed => ChannelClosed
+    @internal.InvalidUsage => InvalidArgument
     @internal.Internal => Internal
+    @internal.Unknown(_) => Internal
+  }
+  let details = match error.kind {
+    @internal.Unknown(unknown_kind) =>
+      merge_unknown_backend_kind_detail(error.details, unknown_kind)
+    _ => error.details
   }
   {
     code,
     message: error.message,
-    details: error.details,
+    details,
     metadata: metadata_from_backend(error.metadata_text, error.metadata_binary),
     kind,
   }
